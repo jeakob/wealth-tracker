@@ -1,17 +1,13 @@
 services:
   frontend:
-    build:
-      context: ./frontend
-      args:
-        REACT_APP_API_URL: ${API_URL}
+    image: jeakob/wealthtracker-frontend:v4
     ports:
       - '3000:3000'
     environment:
       # Set API host for frontend. Default is localhost, but you can override it when deploying.
-      #- REACT_APP_API_URL=${API_HOST:-http://localhost:4000}
-      #- REACT_APP_API_URL=http://192.168.0.3:4000
-      - API_URL=http://192.168.0.3:4000
+      - REACT_APP_API_URL=${API_HOST:-http://localhost:4000}
       - REACT_APP_JWT_STORAGE=localStorage
+      - API_URL=http://192.168.0.10:4000 ##### Point this to the IP address of the backend
       - REACT_APP_SECURE=false
     depends_on:
       - backend
@@ -19,7 +15,7 @@ services:
       - app-network
 
   backend:
-    build: ./backend
+    image: jeakob/wealthtracker-backend:v4
     ports:
       - '4000:4000'
     environment:
@@ -57,8 +53,3 @@ volumes:
 networks:
   app-network:
     driver: bridge
-
-# To override API_HOST, run:
-#   API_HOST=http://backend:4000 docker-compose up
-# or for remote:
-#   API_HOST=http://192.168.1.100:4000 docker-compose up
