@@ -1,0 +1,64 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: ${API_URL}
+    ports:
+      - '3000:3000'
+    environment:
+      # Set API host for frontend. Default is localhost, but you can override it when deploying.
+      #- REACT_APP_API_URL=${API_HOST:-http://localhost:4000}
+      #- REACT_APP_API_URL=http://192.168.0.3:4000
+      - API_URL=http://192.168.0.3:4000
+      - REACT_APP_JWT_STORAGE=localStorage
+      - REACT_APP_SECURE=false
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  backend:
+    build: ./backend
+    ports:
+      - '4000:4000'
+    environment:
+      - DATABASE_URL=postgresql://wealth_user:securepassword@db:5432/wealth_db
+      - DB_TYPE=postgres
+      - JWT_SECRET=your_jwt_secret
+      - JWT_EXPIRES_IN=3600s
+      - SSL_KEY_PATH=/etc/ssl/private/server.key
+      - SSL_CERT_PATH=/etc/ssl/certs/server.crt
+    depends_on:
+      - db
+    volumes:
+      - ./backend/certs:/etc/ssl:ro
+    networks:
+      - app-network
+
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: wealth_db
+      POSTGRES_USER: wealth_user
+      POSTGRES_PASSWORD: securepassword
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - '5432:5432'
+    networks:
+      - app-network
+
+volumes:
+  db_data:
+
+networks:
+  app-network:
+    driver: bridge
+
+# To override API_HOST, run:
+#   API_HOST=http://backend:4000 docker-compose up
+# or for remote:
+#   API_HOST=http://192.168.1.100:4000 docker-compose up

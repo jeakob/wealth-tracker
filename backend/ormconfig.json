@@ -1,0 +1,14 @@
+{
+  "type": "postgres",
+  "host": "db",
+  "port": 5432,
+  "username": "wealth_user",
+  "password": "securepassword",
+  "database": "wealth_db",
+  "entities": ["dist/**/*.entity.js"],
+  "synchronize": false,
+  "migrations": ["dist/migrations/*.js"],
+  "cli": {
+    "migrationsDir": "src/migrations"
+  }
+}
