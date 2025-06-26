@@ -1,5 +1,12 @@
 # Wealth Tracker
 
+<p align="center">
+  <img src="wealth-tracker-logo-transparent.png" width="300" />
+</p>
+
+<img src="screenshot1.png" alt="App Screenshot" width="1000"/>
+<img src="screenshot2.png" alt="App Screenshot" width="1000"/>
+
 Wealth Tracker is a full-stack web application designed to help users track, visualize, and manage their assets and bank accounts over time. It provides a modern dashboard for entering, editing, and analyzing your financial data, supporting multiple asset types and currencies.
 
 ## Purpose
