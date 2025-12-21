@@ -1,13 +1,15 @@
 services:
   frontend:
-    build: ./frontend
+    image: jeakob/wealth-tracker-frontend:v10
     ports:
       - '3000:3000'
     environment:
-      # Set API host for frontend. Default is localhost, but you can override it when deploying.
-      - REACT_APP_API_URL=${API_HOST:-http://localhost:4000}
+      # API_URL: Configure this based on your deployment
+      # - For local development: http://localhost:4000
+      # - For production with domain: https://api.yourdomain.com or https://yourdomain.com/api
+      # - Override with: API_URL=https://your-api-url docker-compose -f docker-compose.prod.yml up
+      - API_URL=${API_URL:-http://localhost:4000}
       - REACT_APP_JWT_STORAGE=localStorage
-      - API_URL=http://localhost:4000
       - REACT_APP_SECURE=false
     depends_on:
       - backend
@@ -15,7 +17,7 @@ services:
       - app-network
 
   backend:
-    build: ./backend
+    image: jeakob/wealth-tracker-backend:v10
     ports:
       - '4000:4000'
     environment:
