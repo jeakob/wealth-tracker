@@ -7,4 +7,4 @@ import { BankAccountController } from '../controllers/bankaccount.controller';
   imports: [TypeOrmModule.forFeature([BankAccount])],
   controllers: [BankAccountController],
 })
-export class BankAccountModule {}
+export class BankAccountModule { }

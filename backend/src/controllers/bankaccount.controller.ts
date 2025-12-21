@@ -8,7 +8,7 @@ export class BankAccountController {
   constructor(
     @InjectRepository(BankAccount)
     private readonly bankAccountRepo: Repository<BankAccount>,
-  ) {}
+  ) { }
 
   @Get()
   async findAll(): Promise<BankAccount[]> {
