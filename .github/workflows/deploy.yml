@@ -384,19 +384,28 @@ jobs:
           echo "📁 Checking build output..."
           ls -la
           
+          # Check for both dist and build directories
           if [ -d "dist" ]; then
-            echo "✅ Build directory exists"
-            ls -la dist/
-            
-            # Add a notice to the built index.html
-            if [ -f "dist/index.html" ]; then
-              sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' dist/index.html
-              echo "✅ Added demo banner"
-            fi
+            BUILD_DIR="dist"
+            echo "✅ Build directory 'dist' exists"
+          elif [ -d "build" ]; then
+            BUILD_DIR="build"
+            echo "✅ Build directory 'build' exists"
           else
-            echo "❌ Build directory not found!"
+            echo "❌ No build directory found!"
             exit 1
           fi
+          
+          ls -la "$BUILD_DIR/"
+          
+          # Add a notice to the built index.html
+          if [ -f "$BUILD_DIR/index.html" ]; then
+            sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' "$BUILD_DIR/index.html"
+            echo "✅ Added demo banner"
+          fi
+          
+          # Store the build directory name for the next step
+          echo "BUILD_DIR=$BUILD_DIR" >> $GITHUB_ENV
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -404,7 +413,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './frontend/dist'
+          path: './frontend/${{ env.BUILD_DIR }}'
 
       - name: Deploy to GitHub Pages
         id: deployment
