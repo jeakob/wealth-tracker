@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, LayoutDashboard, PieChart, Settings, Wallet, CreditCard, Building, Plus, List, Github } from "lucide-react";
+import { Menu, LayoutDashboard, PieChart, Settings, Wallet, CreditCard, Building, Plus, List, Github, Users, LogOut, User } from "lucide-react";
+import { useAuth } from '../../context/AuthContext';
 
 // Actually, I'll essentially implement a simple expand/collapse or just static grouping.
 // User didn't explicitly ask for collapsible, just "under Assets".
@@ -11,6 +12,14 @@ import { Menu, LayoutDashboard, PieChart, Settings, Wallet, CreditCard, Building
 
 const Sidebar = ({ className, closeSheet }) => {
     const location = useLocation();
+    const { user, isAdmin, logout } = useAuth();
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+        if (closeSheet) closeSheet();
+    };
 
     return (
         <div className={cn("pb-12 w-64 border-r bg-card h-full min-h-screen flex flex-col", className)}>
@@ -75,6 +84,16 @@ const Sidebar = ({ className, closeSheet }) => {
                             </Link>
                         </Button>
 
+                        {/* Users - Admin Only */}
+                        {isAdmin && (
+                            <Button asChild variant={location.pathname === "/users" ? "secondary" : "ghost"} className="w-full justify-start" onClick={closeSheet}>
+                                <Link to="/users">
+                                    <Users className="w-4 h-4 mr-2" />
+                                    Users
+                                </Link>
+                            </Button>
+                        )}
+
                         {/* Settings */}
                         <Button asChild variant={location.pathname === "/settings" ? "secondary" : "ghost"} className="w-full justify-start" onClick={closeSheet}>
                             <Link to="/settings">
@@ -85,13 +104,39 @@ const Sidebar = ({ className, closeSheet }) => {
                     </div>
                 </div>
             </div>
-            <div className="mt-auto p-4 border-t">
-                <Button asChild variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={closeSheet}>
-                    <a href="https://github.com/jeakob/wealth-tracker" target="_blank" rel="noopener noreferrer">
-                        <Github className="w-4 h-4 mr-2" />
-                        GitHub Repo
-                    </a>
-                </Button>
+
+            {/* User Profile Section */}
+            <div className="mt-auto border-t">
+                <div className="p-4 space-y-3">
+                    {/* Current User Info */}
+                    <div className="flex items-center gap-3 px-2 py-2 rounded-lg bg-muted/50">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center">
+                            <User className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">{user?.username}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+                        </div>
+                    </div>
+
+                    {/* Logout Button */}
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-red-500/10 hover:text-red-400"
+                        onClick={handleLogout}
+                    >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Logout
+                    </Button>
+
+                    {/* GitHub Link */}
+                    <Button asChild variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground" onClick={closeSheet}>
+                        <a href="https://github.com/jeakob/wealth-tracker" target="_blank" rel="noopener noreferrer">
+                            <Github className="w-4 h-4 mr-2" />
+                            GitHub Repo
+                        </a>
+                    </Button>
+                </div>
             </div>
         </div>
     );

@@ -5,8 +5,8 @@ import { InvestmentsModule } from '../investments/investments.module';
 import { BankAccountModule } from './bankaccount.module';
 import { AssetModule } from './asset.module';
 import { NetWorthModule } from './networth.module';
-
 import { LiabilityModule } from './liability.module';
+import { UsersModule } from './users.module';
 
 @Module({
   imports: [
@@ -21,6 +21,7 @@ import { LiabilityModule } from './liability.module';
       synchronize: true, // Set to false in production
     }),
     AuthModule,
+    UsersModule,
     InvestmentsModule,
     BankAccountModule,
     AssetModule,
