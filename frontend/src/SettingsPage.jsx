@@ -8,7 +8,7 @@ import { useTheme } from "@/components/ThemeProvider"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getAssets, deleteAsset } from './api/index'; // Import for clear data
+import { getAssets, deleteAsset, getBankAccounts, deleteBankAccount } from './api/index'; // Import for clear data
 
 function SettingsPage({ defaultCurrency, setDefaultCurrency }) {
   const { theme, setTheme } = useTheme()
@@ -24,10 +24,13 @@ function SettingsPage({ defaultCurrency, setDefaultCurrency }) {
     setClearSuccess('');
 
     try {
-      // 1. Fetch all assets
-      const assets = await getAssets();
+      // 1. Delete Bank Accounts first (this auto-deletes their linked Assets)
+      const bankAccounts = await getBankAccounts();
+      await Promise.all(bankAccounts.map(acc => deleteBankAccount(acc.id)));
 
-      // 2. Delete all assets one by one (since no bulk delete API)
+      // 2. Fetch remaining assets and delete them
+      // (We fetch again to avoid trying to delete assets that were just removed by bank account deletion)
+      const assets = await getAssets();
       await Promise.all(assets.map(asset => deleteAsset(asset.id)));
 
       setClearSuccess("All data has been successfully deleted.");

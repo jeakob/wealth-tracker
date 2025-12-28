@@ -7,8 +7,13 @@ export const getBankAccounts = async () => {
   return response.data;
 };
 
-export const addBankAccount = async (name) => {
-  const res = await axios.post(`${API_URL}/bankaccounts`, { name });
+export const addBankAccount = async (account) => {
+  const res = await axios.post(`${API_URL}/bankaccounts`, account);
+  return res.data;
+};
+
+export const updateBankAccount = async (id, data) => {
+  const res = await axios.put(`${API_URL}/bankaccounts/${id}`, data);
   return res.data;
 };
 
@@ -34,5 +39,35 @@ export const updateAsset = async (id, asset) => {
 
 export const deleteAsset = async (id) => {
   const res = await axios.delete(`${API_URL}/assets/${id}`);
+  return res.data;
+};
+
+export const getNetWorthSnapshots = async () => {
+  const res = await axios.get(`${API_URL}/net-worth/snapshots`);
+  return res.data;
+};
+
+export const recalculateNetWorth = async () => {
+  const res = await axios.post(`${API_URL}/net-worth/recalculate`);
+  return res.data;
+};
+
+export const getLiabilities = async () => {
+  const res = await axios.get(`${API_URL}/liabilities`);
+  return res.data;
+};
+
+export const addLiability = async (liability) => {
+  const res = await axios.post(`${API_URL}/liabilities`, liability);
+  return res.data;
+};
+
+export const updateLiability = async (id, liability) => {
+  const res = await axios.put(`${API_URL}/liabilities/${id}`, liability);
+  return res.data;
+};
+
+export const deleteLiability = async (id) => {
+  const res = await axios.delete(`${API_URL}/liabilities/${id}`);
   return res.data;
 };

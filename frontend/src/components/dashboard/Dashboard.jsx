@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Wallet, TrendingUp, Droplets, Activity, ArrowRight } from "lucide-react";
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { getAssetIcon } from '@/lib/assetIcons';
+import { getLiabilities } from '@/api';
+import { pluralizeAssetType } from '@/lib/utils';
 
 const COLORS = [
     "#10b981", // emerald-500
@@ -20,13 +22,30 @@ const COLORS = [
 ];
 
 const Dashboard = ({ assets, defaultCurrency = 'USD' }) => {
-    // 1. Calculate Metrics
-    const liabilities = 0; // Placeholder until backend support
+    const [liabilities, setLiabilities] = useState([]);
+
+    useEffect(() => {
+        const fetchLiabilities = async () => {
+            try {
+                const data = await getLiabilities();
+                setLiabilities(data);
+            } catch (err) {
+                console.error('Failed to fetch liabilities:', err);
+            }
+        };
+        fetchLiabilities();
+    }, []);
+
+    // Calculate total liabilities (only those included in net worth)
+    const totalLiabilities = liabilities
+        .filter(l => l.includeInNetWorth)
+        .reduce((sum, l) => sum + Number(l.balance), 0);
 
     // Define Liquid Categories
     const liquidTypes = [
         'Savings Account',
         'Savings & Cash',
+        'Bank Account',
         'Stocks/Shares Portfolio',
         'Cryptocurrency',
         'Bonds Portfolio',
@@ -38,6 +57,7 @@ const Dashboard = ({ assets, defaultCurrency = 'USD' }) => {
         if (!type) return false;
         const lower = type.toLowerCase();
         return liquidTypes.some(t => lower.includes(t.toLowerCase())) ||
+            lower.includes('bank') ||
             lower.includes('cash') ||
             lower.includes('stock') ||
             lower.includes('crypto') ||
@@ -49,8 +69,8 @@ const Dashboard = ({ assets, defaultCurrency = 'USD' }) => {
         .filter(a => isLiquid(a.type))
         .reduce((sum, a) => sum + Number(a.value), 0);
 
-    const netWorth = totalAssets - liabilities;
-    const liquidNetWorth = liquidAssets - liabilities;
+    const netWorth = totalAssets - totalLiabilities;
+    const liquidNetWorth = liquidAssets - totalLiabilities;
 
     // 2. Prepare Chart Data (Category Breakdown)
     const categoryMap = assets.reduce((acc, asset) => {
@@ -162,7 +182,7 @@ const Dashboard = ({ assets, defaultCurrency = 'USD' }) => {
                                     <div className="flex items-center gap-2">
                                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                                         <span className="truncate max-w-[150px] capitalize">
-                                            {item.name === 'bank' ? 'Bank Account' : item.name}
+                                            {pluralizeAssetType(item.name)}
                                         </span>
                                     </div>
                                     <span className="font-mono text-xs">{((item.value / totalAssets) * 100).toFixed(1)}%</span>

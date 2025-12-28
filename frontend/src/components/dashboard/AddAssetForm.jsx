@@ -31,20 +31,27 @@ const AddAssetForm = ({ onAdd, onSave, editingAsset, onCancelEdit, bankAccounts,
         date: new Date().toISOString().slice(0, 10),
     });
 
+    const [error, setError] = useState('');
+
     useEffect(() => {
         if (editingAsset) {
             setForm(editingAsset);
         } else {
             setForm(prev => ({ ...prev, currency: defaultCurrency || 'USD' }));
         }
+        setError('');
     }, [editingAsset, defaultCurrency]);
 
     const handleChange = (field, value) => {
         setForm(prev => ({ ...prev, [field]: value }));
+        if (error) setError('');
     };
 
     const handleSubmit = () => {
-        if (!form.name || !form.value) return;
+        if (!form.name || !form.value) {
+            setError('Name and Value are required.');
+            return;
+        }
         if (editingAsset) {
             onSave(form);
         } else {
@@ -123,13 +130,16 @@ const AddAssetForm = ({ onAdd, onSave, editingAsset, onCancelEdit, bankAccounts,
                     </div>
                 </div>
 
-                <div className="mt-6 flex justify-end gap-2">
-                    {editingAsset && (
-                        <Button variant="outline" onClick={onCancelEdit}>Cancel</Button>
-                    )}
-                    <Button onClick={handleSubmit} className="w-full md:w-auto">
-                        {editingAsset ? <><Save className="mr-2 h-4 w-4" /> Save Changes</> : <><PlusCircle className="mr-2 h-4 w-4" /> Add Asset</>}
-                    </Button>
+                <div className="mt-6 flex flex-col gap-2">
+                    {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
+                    <div className="flex justify-end gap-2">
+                        {editingAsset && (
+                            <Button variant="outline" onClick={onCancelEdit}>Cancel</Button>
+                        )}
+                        <Button onClick={handleSubmit} className="w-full md:w-auto">
+                            {editingAsset ? <><Save className="mr-2 h-4 w-4" /> Save Changes</> : <><PlusCircle className="mr-2 h-4 w-4" /> Add Asset</>}
+                        </Button>
+                    </div>
                 </div>
             </CardContent>
         </Card>

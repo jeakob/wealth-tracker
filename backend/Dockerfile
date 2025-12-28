@@ -1,16 +1,15 @@
-# Backend Dockerfile
-FROM node:20-alpine as build
+FROM node:20-alpine AS build
 WORKDIR /app
-COPY package*.json ./
+COPY backend/package*.json ./
 RUN npm install --frozen-lockfile
-COPY . .
+COPY backend .
 RUN npm run build
 
-FROM node:20-alpine as prod
+FROM node:20-alpine AS prod
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
-COPY ./certs /etc/ssl
+COPY backend/certs /etc/ssl
 RUN chown -R node:node /app
 USER node
 EXPOSE 4000

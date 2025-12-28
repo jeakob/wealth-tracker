@@ -1,11 +1,14 @@
 import React from 'react';
-import { Wallet, TrendingUp, PiggyBank, Building2, Home, Gem, Coins, HelpCircle } from "lucide-react";
+import { Wallet, TrendingUp, PiggyBank, Building2, Home, Gem, Coins, HelpCircle, Landmark } from "lucide-react";
 
 export const getAssetIcon = (type) => {
     // Normalize type for comparison
     const normalizedType = type ? type.toLowerCase() : '';
 
-    if (normalizedType.includes('savings') || normalizedType.includes('cash') || normalizedType === 'bank') {
+    if (normalizedType.includes('bank')) {
+        return <Landmark className="w-4 h-4 text-emerald-500" />;
+    }
+    if (normalizedType.includes('savings') || normalizedType.includes('cash')) {
         return <Wallet className="w-4 h-4 text-emerald-500" />;
     }
     if (normalizedType.includes('investment') || normalizedType.includes('isa') || normalizedType.includes('stock') || normalizedType.includes('share') || normalizedType.includes('bond')) {

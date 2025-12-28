@@ -4,6 +4,9 @@ import { AuthModule } from '../auth/auth.module';
 import { InvestmentsModule } from '../investments/investments.module';
 import { BankAccountModule } from './bankaccount.module';
 import { AssetModule } from './asset.module';
+import { NetWorthModule } from './networth.module';
+
+import { LiabilityModule } from './liability.module';
 
 @Module({
   imports: [
@@ -21,6 +24,8 @@ import { AssetModule } from './asset.module';
     InvestmentsModule,
     BankAccountModule,
     AssetModule,
+    NetWorthModule,
+    LiabilityModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

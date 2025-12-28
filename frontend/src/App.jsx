@@ -100,8 +100,8 @@ function AppContent() {
           } />
           <Route path="/assets" element={<ManageAssetsPage assets={assets} onUpdate={handleUpdateAsset} onDelete={handleDeleteAsset} />} />
           <Route path="/add-asset" element={<AddAssetPage onAdd={handleAddAsset} bankAccounts={bankAccounts} defaultCurrency={defaultCurrency} />} />
-          <Route path="/liabilities" element={<LiabilitiesPage />} />
-          <Route path="/bank-accounts" element={<BankAccountsPage />} />
+          <Route path="/liabilities" element={<LiabilitiesPage defaultCurrency={defaultCurrency} />} />
+          <Route path="/bank-accounts" element={<BankAccountsPage defaultCurrency={defaultCurrency} />} />
           <Route path="/graphs" element={<GraphsPage assets={assets} defaultCurrency={defaultCurrency} />} />
           <Route path="/settings" element={<SettingsPage defaultCurrency={defaultCurrency} setDefaultCurrency={setDefaultCurrency} />} />
         </Routes>

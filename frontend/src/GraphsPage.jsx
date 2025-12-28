@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
 import { getAssetIcon } from "@/lib/assetIcons";
 import { Link } from 'react-router-dom';
@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { DatePicker } from "@/components/ui/custom-date-picker";
 import { ArrowLeft, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
+import { getNetWorthSnapshots, recalculateNetWorth } from "@/api";
+import { pluralizeAssetType } from "@/lib/utils";
 
 // Firetracker / Financial Palette (High Contrast)
 const COLORS = [
@@ -36,10 +38,28 @@ function GraphsPage({ assets, defaultCurrency = 'USD' }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [stackBy, setStackBy] = useState('assetType'); // 'assetType' or 'currency'
+  const [snapshots, setSnapshots] = useState([]);
 
   const symbol = CURRENCY_SYMBOLS[defaultCurrency] || defaultCurrency;
 
-  // --- Filtering Logic ---
+  useEffect(() => {
+    const fetchSnapshots = async () => {
+      try {
+        let data = await getNetWorthSnapshots();
+        if ((!data || data.length === 0) && assets.length > 0) {
+          // If no snapshots but we have assets, trigger initial calculation
+          await recalculateNetWorth();
+          data = await getNetWorthSnapshots();
+        }
+        setSnapshots(data || []);
+      } catch (err) {
+        console.error("Failed to fetch snapshots", err);
+      }
+    };
+    fetchSnapshots();
+  }, [assets]); // Re-fetch if assets prop changes (e.g. parent updates)
+
+  // --- Filtering Logic for ASSETS (Evolution Graph) ---
   const filteredAssets = assets.filter(asset => {
     const assetDate = new Date(asset.date);
     const start = startDate ? new Date(startDate) : null;
@@ -50,7 +70,27 @@ function GraphsPage({ assets, defaultCurrency = 'USD' }) {
     return true;
   });
 
-  // --- Stacked Bar Chart Data Preparation ---
+  // --- Snapshot Data for Trend ---
+  const trendData = snapshots.map(s => ({
+    date: s.snapshot_date,
+    total: Number(s.total)
+  })).filter(s => {
+    // Apply time range filter to snapshots too
+    const sDate = new Date(s.date);
+    const start = startDate ? new Date(startDate) : null;
+    const end = endDate ? new Date(endDate) : null;
+    if (start && sDate < start) return false;
+    if (end && sDate > end) return false;
+    return true;
+  });
+
+  // Ensure "Today" is represented if valid
+  // (Optional: Carry-over logic if latest snapshot isn't today? 
+  // With syncSnapshots running on every update, this shouldn't be strictly necessary 
+  // unless the user opens the page next day without updates. 
+  // For simplicity, we trust backend standard snapshots for now.)
+
+  // --- Stacked Bar Chart Data Preparation (Evolution) ---
   const combinedData = filteredAssets.reduce((acc, asset) => {
     const key = stackBy === 'assetType' ? asset.type : asset.currency;
     const dateKey = asset.date;
@@ -64,20 +104,18 @@ function GraphsPage({ assets, defaultCurrency = 'USD' }) {
   const uniqueStackKeys = Array.from(new Set(filteredAssets.map(asset => stackBy === 'assetType' ? asset.type : asset.currency)));
 
   // --- Donut Chart Data Preparation (Current Allocation) ---
-  // We use the "latest" date's distribution or the sum of all visible assets? 
-  // Usually "Allocation" implies "Current Net Worth allocation".
-  // Let's take the LATEST date available in the filtered set to show "Current" allocation.
+  // "Current Allocation" should represent the Accumulated Net Worth breakdown at the end of the period.
+  // We ignore startDate for this calculation because Net Worth is a balance sheet item (cumulative),
+  // not a cash flow item (period-specific).
 
-  // Find latest date in filtered assets
-  const latestDate = filteredAssets.length > 0
-    ? filteredAssets.reduce((a, b) => new Date(a.date) > new Date(b.date) ? a : b).date
-    : null;
+  const allocationReferenceDate = endDate ? new Date(endDate) : new Date();
 
-  const currentAssets = latestDate
-    ? filteredAssets.filter(a => a.date === latestDate)
-    : [];
+  // Filter assets that are on or before the reference date
+  const allocationAssets = assets.filter(asset => {
+    return new Date(asset.date) <= allocationReferenceDate;
+  });
 
-  const allocationDataMap = currentAssets.reduce((acc, asset) => {
+  const allocationDataMap = allocationAssets.reduce((acc, asset) => {
     const key = stackBy === 'assetType' ? asset.type : asset.currency;
     if (!acc[key]) acc[key] = 0;
     acc[key] += Number(asset.value);
@@ -154,11 +192,11 @@ function GraphsPage({ assets, defaultCurrency = 'USD' }) {
           </CardHeader>
           <CardContent>
             <div className="h-[300px] w-full">
-              {barChartData.length === 0 ? (
+              {trendData.length === 0 ? (
                 <div className="flex h-full items-center justify-center text-muted-foreground">No data available.</div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={barChartData.map(d => ({ ...d, total: Object.entries(d).reduce((sum, [k, v]) => k !== 'date' ? sum + v : sum, 0) }))}>
+                  <AreaChart data={trendData}>
                     <defs>
                       <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.8} />
@@ -240,9 +278,9 @@ function GraphsPage({ assets, defaultCurrency = 'USD' }) {
                         borderRadius: 'var(--radius)'
                       }}
                       labelFormatter={(label) => format(new Date(label), 'MMMM d, yyyy')}
-                      formatter={(value, name) => [`${symbol}${value.toLocaleString()}`, <span className="capitalize">{name === 'bank' ? 'Bank Account' : name}</span>]}
+                      formatter={(value, name) => [`${symbol}${value.toLocaleString()}`, <span className="capitalize">{pluralizeAssetType(name)}</span>]}
                     />
-                    <Legend formatter={(value) => <span className="capitalize">{value === 'bank' ? 'Bank Account' : value}</span>} />
+                    <Legend formatter={(value) => <span className="capitalize">{pluralizeAssetType(value)}</span>} />
                     {uniqueStackKeys.map((key, index) => (
                       <Bar
                         key={key}
@@ -264,7 +302,7 @@ function GraphsPage({ assets, defaultCurrency = 'USD' }) {
         <Card className="shadow-md">
           <CardHeader>
             <CardTitle>Current Allocation</CardTitle>
-            <CardDescription>Distribution on {latestDate ? format(new Date(latestDate), 'MMM d, yyyy') : 'Latest'}</CardDescription>
+            <CardDescription>Distribution on {format(allocationReferenceDate, 'MMM d, yyyy')}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[300px] w-full relative">
@@ -288,7 +326,7 @@ function GraphsPage({ assets, defaultCurrency = 'USD' }) {
                         ))}
                       </Pie>
                       <Tooltip
-                        formatter={(value) => [`${symbol}${value.toLocaleString()}`, 'Value']}
+                        formatter={(value, name) => [`${symbol}${value.toLocaleString()}`, pluralizeAssetType(name)]}
                         contentStyle={{
                           backgroundColor: 'hsl(var(--card))',
                           borderColor: 'hsl(var(--border))',
@@ -314,7 +352,7 @@ function GraphsPage({ assets, defaultCurrency = 'USD' }) {
                   <div className="flex items-center gap-2 overflow-hidden">
                     <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
                     <span className="flex-shrink-0">{getAssetIcon(item.name)}</span>
-                    <span className="font-medium truncate capitalize" title={item.name}>{item.name === 'bank' ? 'Bank Account' : item.name}</span>
+                    <span className="font-medium truncate capitalize" title={item.name}>{pluralizeAssetType(item.name)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">{((item.value / totalNetWorth) * 100).toFixed(1)}%</span>
