@@ -52,6 +52,11 @@ export const recalculateNetWorth = async () => {
   return res.data;
 };
 
+export const clearNetWorthSnapshots = async () => {
+  const res = await axios.delete(`${API_URL}/net-worth/snapshots`);
+  return res.data;
+};
+
 export const getLiabilities = async () => {
   const res = await axios.get(`${API_URL}/liabilities`);
   return res.data;

@@ -8,7 +8,7 @@ import { useTheme } from "@/components/ThemeProvider"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getAssets, deleteAsset, getBankAccounts, deleteBankAccount } from './api/index'; // Import for clear data
+import { getAssets, deleteAsset, getBankAccounts, deleteBankAccount, clearNetWorthSnapshots } from './api/index'; // Import for clear data
 
 function SettingsPage({ defaultCurrency, setDefaultCurrency }) {
   const { theme, setTheme } = useTheme()
@@ -32,6 +32,9 @@ function SettingsPage({ defaultCurrency, setDefaultCurrency }) {
       // (We fetch again to avoid trying to delete assets that were just removed by bank account deletion)
       const assets = await getAssets();
       await Promise.all(assets.map(asset => deleteAsset(asset.id)));
+
+      // 3. Clear Net Worth snapshots
+      await clearNetWorthSnapshots();
 
       setClearSuccess("All data has been successfully deleted.");
     } catch (e) {

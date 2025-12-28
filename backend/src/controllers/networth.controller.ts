@@ -14,4 +14,9 @@ export class NetWorthController {
     async recalculate() {
         return this.netWorthService.updateTodaySnapshot();
     }
+
+    @Delete('snapshots')
+    async clearSnapshots() {
+        return this.netWorthService.clearAllSnapshots();
+    }
 }
