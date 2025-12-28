@@ -1,12 +1,13 @@
-import { Controller, Get, Post, Body, Delete, Param, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Delete, Param, Put, UseGuards, Req, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BankAccount } from '../entities/bankaccount.entity';
 import { Asset } from '../entities/asset.entity';
-
 import { NetWorthService } from '../services/networth.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('bankaccounts')
+@UseGuards(JwtAuthGuard)
 export class BankAccountController {
   constructor(
     @InjectRepository(BankAccount)
@@ -17,12 +18,14 @@ export class BankAccountController {
   ) { }
 
   @Get()
-  async findAll(): Promise<BankAccount[]> {
-    return this.bankAccountRepo.find();
+  async findAll(@Req() req): Promise<BankAccount[]> {
+    return this.bankAccountRepo.find({
+      where: { user_id: req.user.id }
+    });
   }
 
   @Post()
-  async create(@Body() body: { name: string; initialBalance: number; currency: string; initialDate?: string }): Promise<BankAccount> {
+  async create(@Req() req, @Body() body: { name: string; initialBalance: number; currency: string; initialDate?: string }): Promise<BankAccount> {
     const { name, initialBalance, currency, initialDate } = body;
 
     // Use provided date or default to today
@@ -35,6 +38,7 @@ export class BankAccountController {
       value: initialBalance,
       currency: currency || 'USD',
       date: assetDate,
+      user_id: req.user.id
     });
     const savedAsset = await this.assetRepo.save(newAsset);
 
@@ -44,20 +48,25 @@ export class BankAccountController {
       currentBalance: initialBalance,
       currency: currency || 'USD',
       initialDate: initialDate ? new Date(initialDate) : new Date(),
-      assetId: savedAsset.id
+      assetId: savedAsset.id,
+      user_id: req.user.id
     });
     const savedAccount = await this.bankAccountRepo.save(account);
 
     // Update net worth snapshots
-    await this.netWorthService.updateTodaySnapshot(savedAsset);
+    await this.netWorthService.updateTodaySnapshot(savedAsset, req.user.id);
 
     return savedAccount;
   }
 
   @Put(':id')
-  async update(@Param('id') id: number, @Body() body: { name?: string; initialBalance?: number; currentBalance?: number; currency?: string; initialDate?: string }) {
+  async update(@Req() req, @Param('id') id: number, @Body() body: { name?: string; initialBalance?: number; currentBalance?: number; currency?: string; initialDate?: string }) {
     const account = await this.bankAccountRepo.findOne({ where: { id } });
-    if (!account) return { error: 'Not found' };
+    if (!account) throw new NotFoundException('Account not found');
+
+    if (account.user_id !== req.user.id) {
+      throw new ForbiddenException('You do not have permission to update this account');
+    }
 
     if (body.name !== undefined) account.name = body.name;
     if (body.initialBalance !== undefined) account.initialBalance = body.initialBalance;
@@ -81,22 +90,26 @@ export class BankAccountController {
     }
 
     // Update net worth snapshots
-    await this.netWorthService.updateTodaySnapshot(updatedAsset);
+    await this.netWorthService.updateTodaySnapshot(updatedAsset, req.user.id);
 
     return account;
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: number) {
+  async remove(@Req() req, @Param('id') id: number) {
     const account = await this.bankAccountRepo.findOne({ where: { id } });
     if (account) {
+      if (account.user_id !== req.user.id) {
+        throw new ForbiddenException('You do not have permission to delete this account');
+      }
+
       if (account.assetId) {
         await this.assetRepo.delete(account.assetId);
       }
       await this.bankAccountRepo.remove(account);
 
       // Update net worth snapshots after deletion
-      await this.netWorthService.updateTodaySnapshot();
+      await this.netWorthService.updateTodaySnapshot(undefined, req.user.id);
     }
     return { deleted: true };
   }

@@ -1,10 +1,11 @@
-import { Controller, Get, Post, Body, Put, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Put, Param, Delete, UseGuards, Req, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { LiabilityService } from '../services/liability.service';
 import { Liability } from '../entities/liability.entity';
-
 import { NetWorthService } from '../services/networth.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('liabilities')
+@UseGuards(JwtAuthGuard)
 export class LiabilityController {
     constructor(
         private readonly liabilityService: LiabilityService,
@@ -12,28 +13,30 @@ export class LiabilityController {
     ) { }
 
     @Get()
-    findAll() {
-        return this.liabilityService.findAll();
+    findAll(@Req() req) {
+        return this.liabilityService.findAll(req.user.id);
     }
 
     @Post()
-    async create(@Body() liability: Partial<Liability>) {
-        const result = await this.liabilityService.create(liability);
-        await this.netWorthService.updateTodaySnapshot();
+    async create(@Req() req, @Body() liability: Partial<Liability>) {
+        const result = await this.liabilityService.create(liability, req.user.id);
+        await this.netWorthService.updateTodaySnapshot(undefined, req.user.id);
         return result;
     }
 
     @Put(':id')
-    async update(@Param('id') id: string, @Body() liability: Partial<Liability>) {
-        const result = await this.liabilityService.update(+id, liability);
-        await this.netWorthService.updateTodaySnapshot();
+    async update(@Req() req, @Param('id') id: string, @Body() liability: Partial<Liability>) {
+        const result = await this.liabilityService.update(+id, liability, req.user.id);
+        if (!result) throw new NotFoundException('Liability not found');
+
+        await this.netWorthService.updateTodaySnapshot(undefined, req.user.id);
         return result;
     }
 
     @Delete(':id')
-    async remove(@Param('id') id: string) {
-        const result = await this.liabilityService.remove(+id);
-        await this.netWorthService.updateTodaySnapshot();
-        return result;
+    async remove(@Req() req, @Param('id') id: string) {
+        await this.liabilityService.remove(+id, req.user.id);
+        await this.netWorthService.updateTodaySnapshot(undefined, req.user.id);
+        return { deleted: true };
     }
 }

@@ -19,8 +19,8 @@ export class NetWorthService {
         private bankAccountRepo: Repository<BankAccount>,
     ) { }
 
-    async syncSnapshots(newAsset?: Asset) {
-        let assets = await this.assetRepo.find();
+    async syncSnapshots(userId: number, newAsset?: Asset) {
+        let assets = await this.assetRepo.find({ where: { user_id: userId } });
 
         // Ensure newAsset is included (handle eventual consistency/race conditions)
         if (newAsset) {
@@ -35,11 +35,11 @@ export class NetWorthService {
         // Exclude "Bank Account" type assets since we handle bank accounts separately
         assets = assets.filter(a => a.type !== 'Bank Account');
 
-        const liabilities = await this.liabilityRepo.find();
-        const bankAccounts = await this.bankAccountRepo.find();
+        const liabilities = await this.liabilityRepo.find({ where: { user_id: userId } });
+        const bankAccounts = await this.bankAccountRepo.find({ where: { user_id: userId } });
 
         if (assets.length === 0 && liabilities.length === 0 && bankAccounts.length === 0) {
-            await this.snapshotRepo.clear();
+            await this.snapshotRepo.delete({ user_id: userId });
             return [];
         }
 
@@ -85,7 +85,7 @@ export class NetWorthService {
             // For dates before today, use initialBalance
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            
+
             const totalBankAccounts = bankAccounts
                 .filter(b => {
                     const bankDate = new Date(b.initialDate);
@@ -101,13 +101,6 @@ export class NetWorthService {
                 }, 0);
 
             // Subtract included liabilities
-            // NOTE: Liability 'createdAt' could be used for historical accuracy, 
-            // but for simplicity we'll subtract current liabilities from all active snapshots 
-            // or we assumes liabilities exist 'now'. 
-            // Better approach: filter by creation date if available, or just subtract current set from 'Today' 
-            // and assume they apply historically (or apply from creation date). 
-            // Let's use created_at <= date logic for correctness.
-
             const totalLiabilities = liabilities
                 .filter(l => l.includeInNetWorth)
                 .filter(l => {
@@ -120,11 +113,21 @@ export class NetWorthService {
             const total = totalAssets + totalBankAccounts - totalLiabilities;
 
 
-            let snapshot = await this.snapshotRepo.findOne({ where: { snapshot_date: date } });
+            let snapshot = await this.snapshotRepo.findOne({
+                where: {
+                    snapshot_date: date,
+                    user_id: userId
+                }
+            });
+
             if (snapshot) {
                 snapshot.total = total;
             } else {
-                snapshot = this.snapshotRepo.create({ snapshot_date: date, total });
+                snapshot = this.snapshotRepo.create({
+                    snapshot_date: date,
+                    total,
+                    user_id: userId
+                });
             }
             snapshots.push(await this.snapshotRepo.save(snapshot));
         }
@@ -132,19 +135,20 @@ export class NetWorthService {
         return snapshots;
     }
 
-    async updateTodaySnapshot(newAsset?: Asset) {
-        return this.syncSnapshots(newAsset);
+    async updateTodaySnapshot(newAsset: Asset | undefined, userId: number) {
+        return this.syncSnapshots(userId, newAsset);
     }
 
-    async getAllSnapshots() {
+    async getAllSnapshots(userId: number) {
         return this.snapshotRepo.find({
+            where: { user_id: userId },
             order: {
                 snapshot_date: 'ASC',
             },
         });
     }
 
-    async clearAllSnapshots() {
-        return this.snapshotRepo.clear();
+    async clearAllSnapshots(userId: number) {
+        return this.snapshotRepo.delete({ user_id: userId });
     }
 }

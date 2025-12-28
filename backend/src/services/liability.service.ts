@@ -10,25 +10,34 @@ export class LiabilityService {
         private liabilityRepo: Repository<Liability>,
     ) { }
 
-    findAll(): Promise<Liability[]> {
-        return this.liabilityRepo.find();
+    findAll(userId: number): Promise<Liability[]> {
+        return this.liabilityRepo.find({ where: { user_id: userId } });
     }
 
-    findOne(id: number): Promise<Liability> {
-        return this.liabilityRepo.findOne({ where: { id } });
+    findOne(id: number, userId: number): Promise<Liability> {
+        return this.liabilityRepo.findOne({ where: { id, user_id: userId } });
     }
 
-    create(liability: Partial<Liability>): Promise<Liability> {
-        const newLiability = this.liabilityRepo.create(liability);
+    create(liability: Partial<Liability>, userId: number): Promise<Liability> {
+        const newLiability = this.liabilityRepo.create({
+            ...liability,
+            user_id: userId
+        });
         return this.liabilityRepo.save(newLiability);
     }
 
-    async update(id: number, liability: Partial<Liability>): Promise<Liability> {
+    async update(id: number, liability: Partial<Liability>, userId: number): Promise<Liability> {
+        const existing = await this.findOne(id, userId);
+        if (!existing) return null;
+
         await this.liabilityRepo.update(id, liability);
         return this.liabilityRepo.findOne({ where: { id } });
     }
 
-    async remove(id: number): Promise<void> {
-        await this.liabilityRepo.delete(id);
+    async remove(id: number, userId: number): Promise<void> {
+        const existing = await this.findOne(id, userId);
+        if (existing) {
+            await this.liabilityRepo.delete(id);
+        }
     }
 }

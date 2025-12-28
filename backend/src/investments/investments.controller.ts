@@ -1,13 +1,13 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('investments')
+@UseGuards(JwtAuthGuard)
 export class InvestmentsController {
   @Get()
   findAll() {
-    // TODO: Fetch investments from DB
-    return [
-      { id: 1, asset_type: 'Stock', asset_name: 'AAPL', amount: 10, value: 2000 },
-      { id: 2, asset_type: 'Bond', asset_name: 'US Treasury', amount: 5, value: 1000 },
-    ];
+    // TODO: Implement actual investment tracking per user
+    // For now, return empty list to ensure no data leaks
+    return [];
   }
 }
