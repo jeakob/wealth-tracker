@@ -168,6 +168,8 @@ const Dashboard = ({ assets, defaultCurrency = 'USD' }) => {
                                             ))}
                                         </Pie>
                                         <Tooltip
+                                            cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
+                                            labelFormatter={(label) => pluralizeAssetType(label)}
                                             formatter={(value) => [formatMoney(value), 'Value']}
                                             contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }}
                                         />
