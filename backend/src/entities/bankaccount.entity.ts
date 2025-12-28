@@ -6,7 +6,7 @@ export class BankAccount {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ nullable: true })
   user_id: number;
 
   @ManyToOne(() => User)
