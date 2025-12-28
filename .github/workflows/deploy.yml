@@ -373,23 +373,23 @@ jobs:
           else
             echo "⚠️ No vite.config found, creating one"
             cat > vite.config.js << 'VITE_EOF'
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import path from 'path'
+          import { defineConfig } from 'vite'
+          import react from '@vitejs/plugin-react'
+          import path from 'path'
 
-export default defineConfig({
-  plugins: [react()],
-  base: '/wealth-tracker/',
-  build: {
-    outDir: 'build',
-  },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-})
-VITE_EOF
+          export default defineConfig({
+            plugins: [react()],
+            base: '/wealth-tracker/',
+            build: {
+              outDir: 'build',
+            },
+            resolve: {
+              alias: {
+                '@': path.resolve(__dirname, './src'),
+              },
+            },
+          })
+          VITE_EOF
             echo "✅ Created new vite.config.js"
             exit 0
           fi
