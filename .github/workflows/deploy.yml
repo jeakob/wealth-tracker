@@ -215,7 +215,7 @@ jobs:
             history: {
               getAll: () => {
                 const assets = storage.get('assets') || [];
-                const totalValue = assets.reduce((sum, a) => sum + (a.value || 0), 0);
+                const totalValue = assets.reduce((sum, a) => sum + (parseFloat(a.value) || 0), 0);
                 // Generate mock history data
                 const history = [];
                 for (let i = 30; i >= 0; i--) {
@@ -229,6 +229,35 @@ jobs:
                 }
                 console.log('📊 Getting history:', history.length, 'entries');
                 return Promise.resolve(history);
+              }
+            },
+            
+            netWorth: {
+              getSnapshots: () => {
+                const assets = storage.get('assets') || [];
+                const totalValue = assets.reduce((sum, a) => sum + (parseFloat(a.value) || 0), 0);
+                
+                // Generate snapshots for the last 12 months
+                const snapshots = [];
+                const now = new Date();
+                
+                for (let i = 11; i >= 0; i--) {
+                  const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                  const variation = 0.85 + (Math.random() * 0.3); // Random variation between 0.85 and 1.15
+                  
+                  snapshots.push({
+                    id: `snapshot_${i}`,
+                    date: date.toISOString().split('T')[0], // YYYY-MM-DD format
+                    totalAssets: totalValue * variation,
+                    totalLiabilities: 0,
+                    netWorth: totalValue * variation,
+                    createdAt: date.toISOString(),
+                    updatedAt: date.toISOString()
+                  });
+                }
+                
+                console.log('📊 Getting net worth snapshots:', snapshots.length, 'entries');
+                return Promise.resolve(snapshots);
               }
             }
           };
@@ -269,7 +298,8 @@ jobs:
                    url.includes('/bankaccounts') ||
                    url.includes('/liabilities') ||
                    url.includes('/settings') ||
-                   url.includes('/history');
+                   url.includes('/history') ||
+                   url.includes('/net-worth');
           };
           
           // Helper to create proper fetch Response
@@ -351,6 +381,10 @@ jobs:
                     // Handle liabilities endpoint (return empty array for now)
                     response = [];
                     console.log('✅ Liabilities retrieved via XHR: 0 liabilities');
+                  } else if (url.includes('/net-worth')) {
+                    // Handle net-worth snapshots endpoint
+                    response = await mockAPI.netWorth.getSnapshots();
+                    console.log('✅ Net worth snapshots retrieved via XHR:', response.length, 'snapshots');
                   } else {
                     response = { message: 'Endpoint not implemented' };
                     console.warn('⚠️ Unhandled endpoint:', url);
@@ -489,6 +523,12 @@ jobs:
                   // Handle liabilities endpoint (return empty array for now)
                   console.log('✅ Liabilities retrieved via fetch: 0 liabilities');
                   return createResponse([]);
+                } else if (url.includes('/net-worth')) {
+                  // Handle net-worth snapshots endpoint
+                  return mockAPI.netWorth.getSnapshots().then(data => {
+                    console.log('✅ Net worth snapshots retrieved via fetch:', data.length, 'snapshots');
+                    return createResponse(data);
+                  });
                 }
                 
                 console.warn('⚠️ Unhandled endpoint via fetch:', url);
@@ -504,7 +544,7 @@ jobs:
           };
           
           console.log('✅ Browser storage API interceptor loaded (fetch + XHR)');
-          console.log('📡 Intercepting: localhost:4000, /api/, /assets, /bankaccounts, /liabilities, /settings, /history');
+          console.log('📡 Intercepting: localhost:4000, /api/, /assets, /bankaccounts, /liabilities, /net-worth, /settings, /history');
           INTERCEPTOR_EOF
 
       - name: Inject interceptor into entry point
