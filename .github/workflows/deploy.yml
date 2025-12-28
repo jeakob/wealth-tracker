@@ -78,6 +78,7 @@ jobs:
             set: (key, value) => {
               try {
                 localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+                console.log('💾 Saved to storage:', key, value);
                 return true;
               } catch (e) {
                 console.error('Storage set error:', e);
@@ -111,6 +112,7 @@ jobs:
           // Initialize with sample data if empty
           const initSampleData = () => {
             if (!storage.get('initialized')) {
+              console.log('🎬 Initializing sample data...');
               storage.set('initialized', true);
               storage.set('assets', [
                 {
@@ -139,52 +141,73 @@ jobs:
                 theme: 'dark',
                 locale: 'en-US'
               });
+              console.log('✅ Sample data initialized');
             }
           };
           
           export const mockAPI = {
             assets: {
-              getAll: () => Promise.resolve(storage.get('assets') || []),
+              getAll: () => {
+                const assets = storage.get('assets') || [];
+                console.log('📋 Getting all assets:', assets.length);
+                return Promise.resolve(assets);
+              },
               getById: (id) => {
                 const assets = storage.get('assets') || [];
-                return Promise.resolve(assets.find(a => a.id === id) || null);
+                const asset = assets.find(a => a.id === id) || null;
+                console.log('🔍 Getting asset by id:', id, asset);
+                return Promise.resolve(asset);
               },
               create: (asset) => {
+                console.log('➕ Creating asset:', asset);
                 const assets = storage.get('assets') || [];
                 const newAsset = {
                   ...asset,
-                  id: Date.now().toString(),
+                  id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
                   createdAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString()
                 };
                 assets.push(newAsset);
                 storage.set('assets', assets);
+                console.log('✅ Asset created:', newAsset);
                 return Promise.resolve(newAsset);
               },
               update: (id, updates) => {
+                console.log('📝 Updating asset:', id, updates);
                 const assets = storage.get('assets') || [];
                 const index = assets.findIndex(a => a.id === id);
                 if (index >= 0) {
                   assets[index] = { ...assets[index], ...updates, updatedAt: new Date().toISOString() };
                   storage.set('assets', assets);
+                  console.log('✅ Asset updated:', assets[index]);
                   return Promise.resolve(assets[index]);
                 }
+                console.warn('⚠️ Asset not found:', id);
                 return Promise.resolve(null);
               },
               delete: (id) => {
+                console.log('🗑️ Deleting asset:', id);
                 let assets = storage.get('assets') || [];
+                const initialLength = assets.length;
                 assets = assets.filter(a => a.id !== id);
                 storage.set('assets', assets);
-                return Promise.resolve({ success: true });
+                console.log('✅ Asset deleted, remaining:', assets.length);
+                return Promise.resolve({ success: true, deleted: initialLength !== assets.length });
               }
             },
             
             settings: {
-              get: () => Promise.resolve(storage.get('settings') || { currency: 'USD', theme: 'dark' }),
+              get: () => {
+                const settings = storage.get('settings') || { currency: 'USD', theme: 'dark' };
+                console.log('⚙️ Getting settings:', settings);
+                return Promise.resolve(settings);
+              },
               update: (updates) => {
+                console.log('⚙️ Updating settings:', updates);
                 const current = storage.get('settings') || {};
                 const updated = { ...current, ...updates };
                 storage.set('settings', updated);
+                console.log('✅ Settings updated:', updated);
                 return Promise.resolve(updated);
               }
             },
@@ -204,6 +227,7 @@ jobs:
                     assetBreakdown: {}
                   });
                 }
+                console.log('📊 Getting history:', history.length, 'entries');
                 return Promise.resolve(history);
               }
             }
@@ -235,69 +259,91 @@ jobs:
           
           const originalFetch = window.fetch;
           
+          // Helper to create proper fetch Response
+          const createResponse = (data) => {
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              statusText: 'OK',
+              headers: new Headers({ 'content-type': 'application/json' }),
+              json: () => Promise.resolve(data),
+              text: () => Promise.resolve(JSON.stringify(data)),
+              clone: function() { return this; }
+            });
+          };
+          
           window.fetch = function(...args) {
             const url = args[0];
             const options = args[1] || {};
             
             // Intercept API calls
             if (typeof url === 'string' && url.includes('/api/')) {
-              console.log('🔄 Intercepted API call:', url, options);
+              console.log('🔄 Intercepted API call:', url, options.method || 'GET');
               
               // Assets endpoints
               if (url.includes('/api/assets')) {
                 if (options.method === 'POST') {
-                  return mockAPI.assets.create(JSON.parse(options.body));
+                  const body = options.body ? JSON.parse(options.body) : {};
+                  return mockAPI.assets.create(body).then(data => {
+                    console.log('✅ Asset created:', data);
+                    return createResponse(data);
+                  });
                 } else if (options.method === 'PUT' || options.method === 'PATCH') {
                   const id = url.split('/').pop();
-                  return mockAPI.assets.update(id, JSON.parse(options.body));
+                  const body = options.body ? JSON.parse(options.body) : {};
+                  return mockAPI.assets.update(id, body).then(data => {
+                    console.log('✅ Asset updated:', data);
+                    return createResponse(data);
+                  });
                 } else if (options.method === 'DELETE') {
                   const id = url.split('/').pop();
-                  return mockAPI.assets.delete(id);
+                  return mockAPI.assets.delete(id).then(data => {
+                    console.log('✅ Asset deleted:', id);
+                    return createResponse(data);
+                  });
                 } else {
                   // GET
                   if (url.match(/\/api\/assets\/[^/]+$/)) {
                     const id = url.split('/').pop();
-                    return mockAPI.assets.getById(id).then(data => ({
-                      ok: true,
-                      json: () => Promise.resolve(data)
-                    }));
+                    return mockAPI.assets.getById(id).then(data => {
+                      console.log('✅ Asset retrieved:', data);
+                      return createResponse(data);
+                    });
                   }
-                  return mockAPI.assets.getAll().then(data => ({
-                    ok: true,
-                    json: () => Promise.resolve(data)
-                  }));
+                  return mockAPI.assets.getAll().then(data => {
+                    console.log('✅ Assets retrieved:', data.length, 'assets');
+                    return createResponse(data);
+                  });
                 }
               }
               
               // Settings endpoints
               if (url.includes('/api/settings')) {
                 if (options.method === 'PUT' || options.method === 'PATCH' || options.method === 'POST') {
-                  return mockAPI.settings.update(JSON.parse(options.body)).then(data => ({
-                    ok: true,
-                    json: () => Promise.resolve(data)
-                  }));
+                  const body = options.body ? JSON.parse(options.body) : {};
+                  return mockAPI.settings.update(body).then(data => {
+                    console.log('✅ Settings updated:', data);
+                    return createResponse(data);
+                  });
                 } else {
-                  return mockAPI.settings.get().then(data => ({
-                    ok: true,
-                    json: () => Promise.resolve(data)
-                  }));
+                  return mockAPI.settings.get().then(data => {
+                    console.log('✅ Settings retrieved:', data);
+                    return createResponse(data);
+                  });
                 }
               }
               
               // History endpoints
               if (url.includes('/api/history')) {
-                return mockAPI.history.getAll().then(data => ({
-                  ok: true,
-                  json: () => Promise.resolve(data)
-                }));
+                return mockAPI.history.getAll().then(data => {
+                  console.log('✅ History retrieved:', data.length, 'entries');
+                  return createResponse(data);
+                });
               }
               
-              // For axios-style responses, wrap in a Promise
-              return Promise.resolve({
-                ok: true,
-                status: 200,
-                json: () => Promise.resolve({ message: 'Intercepted by browser storage' })
-              });
+              // Default fallback
+              console.warn('⚠️ Unhandled API endpoint:', url);
+              return createResponse({ message: 'Intercepted by browser storage' });
             }
             
             // Pass through non-API calls
