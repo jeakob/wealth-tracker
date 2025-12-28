@@ -267,6 +267,7 @@ jobs:
                    url.includes('/api/') ||
                    url.includes('/assets') ||
                    url.includes('/bankaccounts') ||
+                   url.includes('/liabilities') ||
                    url.includes('/settings') ||
                    url.includes('/history');
           };
@@ -346,30 +347,72 @@ jobs:
                   } else if (url.includes('/history')) {
                     response = await mockAPI.history.getAll();
                     console.log('✅ History retrieved via XHR:', response.length, 'entries');
+                  } else if (url.includes('/liabilities')) {
+                    // Handle liabilities endpoint (return empty array for now)
+                    response = [];
+                    console.log('✅ Liabilities retrieved via XHR: 0 liabilities');
                   } else {
                     response = { message: 'Endpoint not implemented' };
                     console.warn('⚠️ Unhandled endpoint:', url);
                   }
                   
-                  // Simulate successful XHR response
-                  Object.defineProperty(this, 'status', { value: 200, writable: false });
-                  Object.defineProperty(this, 'statusText', { value: 'OK', writable: false });
-                  Object.defineProperty(this, 'readyState', { value: 4, writable: false });
-                  Object.defineProperty(this, 'responseText', { value: JSON.stringify(response), writable: false });
-                  Object.defineProperty(this, 'response', { value: JSON.stringify(response), writable: false });
-                  Object.defineProperty(this, 'responseType', { value: 'json', writable: false });
+                  // Simulate successful XHR response - CRITICAL: responseType must handle both JSON and text
+                  const responseText = JSON.stringify(response);
                   
-                  const event = new Event('load');
-                  this.dispatchEvent(event);
-                  if (this.onload) this.onload(event);
-                  if (this.onreadystatechange) this.onreadystatechange();
+                  Object.defineProperty(this, 'status', { value: 200, writable: false, configurable: true });
+                  Object.defineProperty(this, 'statusText', { value: 'OK', writable: false, configurable: true });
+                  Object.defineProperty(this, 'readyState', { value: 4, writable: false, configurable: true });
+                  Object.defineProperty(this, 'responseText', { value: responseText, writable: false, configurable: true });
+                  
+                  // Handle different response types that axios might expect
+                  const originalResponseType = this.responseType || '';
+                  if (originalResponseType === 'json' || originalResponseType === '') {
+                    // For JSON or default, parse the response
+                    try {
+                      Object.defineProperty(this, 'response', { value: response, writable: false, configurable: true });
+                    } catch (e) {
+                      Object.defineProperty(this, 'response', { value: responseText, writable: false, configurable: true });
+                    }
+                  } else {
+                    // For other types, use responseText
+                    Object.defineProperty(this, 'response', { value: responseText, writable: false, configurable: true });
+                  }
+                  
+                  // Trigger events in the correct order
+                  Object.defineProperty(this, 'readyState', { value: 4, writable: false, configurable: true });
+                  
+                  if (this.onreadystatechange) {
+                    this.onreadystatechange.call(this);
+                  }
+                  
+                  const loadEvent = new ProgressEvent('load', {
+                    lengthComputable: true,
+                    loaded: responseText.length,
+                    total: responseText.length
+                  });
+                  
+                  if (this.onload) {
+                    this.onload.call(this, loadEvent);
+                  }
+                  
+                  this.dispatchEvent(loadEvent);
+                  
+                  const loadEndEvent = new ProgressEvent('loadend', {
+                    lengthComputable: true,
+                    loaded: responseText.length,
+                    total: responseText.length
+                  });
+                  this.dispatchEvent(loadEndEvent);
+                  
                 } catch (error) {
                   console.error('❌ XHR error:', error);
-                  Object.defineProperty(this, 'status', { value: 500, writable: false });
-                  Object.defineProperty(this, 'statusText', { value: 'Error', writable: false });
-                  const errorEvent = new Event('error');
+                  Object.defineProperty(this, 'status', { value: 500, writable: false, configurable: true });
+                  Object.defineProperty(this, 'statusText', { value: 'Error', writable: false, configurable: true });
+                  Object.defineProperty(this, 'readyState', { value: 4, writable: false, configurable: true });
+                  
+                  const errorEvent = new ProgressEvent('error');
                   this.dispatchEvent(errorEvent);
-                  if (this.onerror) this.onerror(errorEvent);
+                  if (this.onerror) this.onerror.call(this, errorEvent);
                 }
               };
               
@@ -442,6 +485,10 @@ jobs:
                     console.log('✅ History retrieved via fetch:', data.length, 'entries');
                     return createResponse(data);
                   });
+                } else if (url.includes('/liabilities')) {
+                  // Handle liabilities endpoint (return empty array for now)
+                  console.log('✅ Liabilities retrieved via fetch: 0 liabilities');
+                  return createResponse([]);
                 }
                 
                 console.warn('⚠️ Unhandled endpoint via fetch:', url);
@@ -457,7 +504,7 @@ jobs:
           };
           
           console.log('✅ Browser storage API interceptor loaded (fetch + XHR)');
-          console.log('📡 Intercepting: localhost:4000, /api/, /assets, /bankaccounts, /settings, /history');
+          console.log('📡 Intercepting: localhost:4000, /api/, /assets, /bankaccounts, /liabilities, /settings, /history');
           INTERCEPTOR_EOF
 
       - name: Inject interceptor into entry point
@@ -569,6 +616,37 @@ jobs:
           echo "✅ Updated vite.config"
           echo "📄 New config:"
           cat "$CONFIG_FILE"
+          
+          # Now also patch React Router to use basename
+          echo "📝 Looking for React Router configuration..."
+          
+          # Find files that might contain BrowserRouter or Router setup
+          ROUTER_FILES=$(find src -type f \( -name "*.jsx" -o -name "*.tsx" -o -name "*.js" -o -name "*.ts" \) -exec grep -l "BrowserRouter\|createBrowserRouter\|Router" {} \; 2>/dev/null || echo "")
+          
+          if [ -n "$ROUTER_FILES" ]; then
+            echo "Found potential router files:"
+            echo "$ROUTER_FILES"
+            
+            for file in $ROUTER_FILES; do
+              echo "📝 Patching router in: $file"
+              
+              # Backup the file
+              cp "$file" "${file}.backup"
+              
+              # Add basename to BrowserRouter if it doesn't have one
+              if grep -q "<BrowserRouter>" "$file" 2>/dev/null; then
+                sed -i "s|<BrowserRouter>|<BrowserRouter basename=\"/$REPO_NAME\">|g" "$file"
+                echo "✅ Added basename to BrowserRouter in $file"
+              fi
+              
+              # For createBrowserRouter, it's more complex - just log it
+              if grep -q "createBrowserRouter" "$file" 2>/dev/null; then
+                echo "⚠️ Found createBrowserRouter in $file - may need manual basename configuration"
+              fi
+            done
+          else
+            echo "⚠️ No router files found - app might use hash routing or different setup"
+          fi
 
       - name: Build
         working-directory: ./frontend
@@ -595,10 +673,19 @@ jobs:
           
           ls -la "$BUILD_DIR/"
           
+          # Add 404.html for client-side routing (SPA fallback)
+          echo "📝 Creating 404.html for SPA routing..."
+          cp "$BUILD_DIR/index.html" "$BUILD_DIR/404.html"
+          
           # Add a notice to the built index.html
           if [ -f "$BUILD_DIR/index.html" ]; then
             sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' "$BUILD_DIR/index.html"
             echo "✅ Added demo banner"
+          fi
+          
+          # Also add banner to 404.html
+          if [ -f "$BUILD_DIR/404.html" ]; then
+            sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' "$BUILD_DIR/404.html"
           fi
           
           # Store the build directory name for the next step
