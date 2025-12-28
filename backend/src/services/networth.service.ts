@@ -81,14 +81,24 @@ export class NetWorthService {
                 .reduce((sum, a) => sum + Number(a.value), 0);
 
             // Add bank account initial balances where initialDate <= this date
-            // For dates before a bank account's initial date, it won't be included
+            // For the current date (today) and beyond, use currentBalance
+            // For dates before today, use initialBalance
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
             const totalBankAccounts = bankAccounts
                 .filter(b => {
                     const bankDate = new Date(b.initialDate);
                     bankDate.setHours(0, 0, 0, 0);
                     return bankDate <= date;
                 })
-                .reduce((sum, b) => sum + Number(b.initialBalance), 0);
+                .reduce((sum, b) => {
+                    // Use currentBalance for today and future dates, initialBalance for historical dates
+                    const isToday = date.getTime() === today.getTime();
+                    const isFuture = date > today;
+                    const balanceToUse = (isToday || isFuture) ? Number(b.currentBalance) : Number(b.initialBalance);
+                    return sum + balanceToUse;
+                }, 0);
 
             // Subtract included liabilities
             // NOTE: Liability 'createdAt' could be used for historical accuracy, 
