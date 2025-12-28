@@ -37,13 +37,29 @@ jobs:
         run: npm ci
 
       - name: Create browser storage adapter
-        working-directory: ./frontend/src
+        working-directory: ./frontend
         run: |
+          echo "📁 Current directory structure:"
+          ls -la
+          
+          # Check if src exists, if not try to find where the source files are
+          if [ -d "src" ]; then
+            echo "✅ src/ directory found"
+            SRC_DIR="src"
+          elif [ -d "app" ]; then
+            echo "✅ app/ directory found (Next.js style)"
+            SRC_DIR="app"
+          else
+            echo "⚠️  Creating src/ directory"
+            mkdir -p src
+            SRC_DIR="src"
+          fi
+          
           # Create lib directory if it doesn't exist
-          mkdir -p lib
+          mkdir -p "$SRC_DIR/lib"
           
           # Create the browser storage module
-          cat > lib/browserStorage.js << 'STORAGE_EOF'
+          cat > "$SRC_DIR/lib/browserStorage.js" << 'STORAGE_EOF'
           // Auto-generated browser storage adapter for GitHub Pages demo
           
           const STORAGE_PREFIX = 'wealth_tracker_';
@@ -202,10 +218,19 @@ jobs:
           STORAGE_EOF
 
       - name: Create API interceptor
-        working-directory: ./frontend/src
+        working-directory: ./frontend
         run: |
+          # Use the same SRC_DIR we found earlier
+          if [ -d "src" ]; then
+            SRC_DIR="src"
+          elif [ -d "app" ]; then
+            SRC_DIR="app"
+          else
+            SRC_DIR="src"
+          fi
+          
           # Create an interceptor that replaces fetch calls
-          cat > lib/apiInterceptor.js << 'INTERCEPTOR_EOF'
+          cat > "$SRC_DIR/lib/apiInterceptor.js" << 'INTERCEPTOR_EOF'
           import mockAPI from './browserStorage.js';
           
           const originalFetch = window.fetch;
@@ -283,25 +308,55 @@ jobs:
           INTERCEPTOR_EOF
 
       - name: Inject interceptor into entry point
-        working-directory: ./frontend/src
+        working-directory: ./frontend
         run: |
-          # Find the main entry file (main.jsx, main.tsx, index.jsx, etc.)
-          ENTRY_FILE=$(find . -maxdepth 1 -name "main.*" -o -name "index.*" | head -1)
+          echo "🔍 Looking for entry file..."
           
-          if [ -z "$ENTRY_FILE" ]; then
-            echo "⚠️  Could not find entry file, creating main.jsx"
-            ENTRY_FILE="main.jsx"
+          # Determine source directory
+          if [ -d "src" ]; then
+            SRC_DIR="src"
+          elif [ -d "app" ]; then
+            SRC_DIR="app"
+          else
+            SRC_DIR="."
           fi
           
-          echo "📝 Injecting interceptor into: $ENTRY_FILE"
+          echo "📁 Using source directory: $SRC_DIR"
+          ls -la "$SRC_DIR/"
           
-          # Create a backup
-          cp "$ENTRY_FILE" "${ENTRY_FILE}.backup"
+          # Find the main entry file
+          ENTRY_FILE=$(find "$SRC_DIR" -maxdepth 1 \( -name "main.*" -o -name "index.*" -o -name "App.*" \) | head -1)
           
-          # Add import at the top of the file
-          echo "import './lib/apiInterceptor.js';" | cat - "$ENTRY_FILE" > temp && mv temp "$ENTRY_FILE"
+          if [ -z "$ENTRY_FILE" ]; then
+            echo "⚠️  Could not find entry file, checking subdirectories..."
+            ENTRY_FILE=$(find "$SRC_DIR" -maxdepth 2 \( -name "main.*" -o -name "index.*" \) | head -1)
+          fi
           
-          echo "✅ Interceptor injected"
+          if [ -z "$ENTRY_FILE" ]; then
+            echo "❌ Could not find entry file. Available files:"
+            find "$SRC_DIR" -type f -name "*.jsx" -o -name "*.tsx" -o -name "*.js" -o -name "*.ts"
+            echo "⚠️  Skipping interceptor injection - will rely on manual API replacement"
+          else
+            echo "📝 Injecting interceptor into: $ENTRY_FILE"
+            
+            # Create a backup
+            cp "$ENTRY_FILE" "${ENTRY_FILE}.backup"
+            
+            # Determine relative path to lib
+            ENTRY_DIR=$(dirname "$ENTRY_FILE")
+            if [ "$ENTRY_DIR" = "$SRC_DIR" ]; then
+              IMPORT_PATH="./lib/apiInterceptor.js"
+            else
+              IMPORT_PATH="../lib/apiInterceptor.js"
+            fi
+            
+            # Add import at the top of the file
+            echo "import '$IMPORT_PATH';" | cat - "$ENTRY_FILE" > temp && mv temp "$ENTRY_FILE"
+            
+            echo "✅ Interceptor injected"
+            echo "📄 Modified file content (first 10 lines):"
+            head -10 "$ENTRY_FILE"
+          fi
 
       - name: Update Vite config for GitHub Pages
         working-directory: ./frontend
@@ -323,11 +378,24 @@ jobs:
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
+          echo "📦 Building frontend..."
           npm run build
           
-          # Add a notice to the built index.html
-          if [ -f "dist/index.html" ]; then
-            sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' dist/index.html
+          echo "📁 Checking build output..."
+          ls -la
+          
+          if [ -d "dist" ]; then
+            echo "✅ Build directory exists"
+            ls -la dist/
+            
+            # Add a notice to the built index.html
+            if [ -f "dist/index.html" ]; then
+              sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' dist/index.html
+              echo "✅ Added demo banner"
+            fi
+          else
+            echo "❌ Build directory not found!"
+            exit 1
           fi
 
       - name: Setup Pages
