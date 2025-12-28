@@ -141,7 +141,26 @@ jobs:
                 theme: 'dark',
                 locale: 'en-US'
               });
-              console.log('✅ Sample data initialized');
+              
+              // Pre-generate net worth snapshots to avoid chart rendering issues
+              const now = new Date();
+              const snapshots = [];
+              for (let i = 11; i >= 0; i--) {
+                const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const value = 75000 * (0.85 + Math.random() * 0.3);
+                snapshots.push({
+                  id: 12 - i,
+                  date: date.toISOString(),
+                  totalAssets: Math.round(value * 100) / 100,
+                  totalLiabilities: 0,
+                  netWorth: Math.round(value * 100) / 100,
+                  createdAt: date.toISOString(),
+                  updatedAt: date.toISOString()
+                });
+              }
+              storage.set('netWorthSnapshots', snapshots);
+              
+              console.log('✅ Sample data initialized with snapshots');
             }
           };
           
