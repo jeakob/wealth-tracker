@@ -1,0 +1,343 @@
+name: Deploy Demo to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Create browser storage adapter
+        working-directory: ./frontend/src
+        run: |
+          # Create lib directory if it doesn't exist
+          mkdir -p lib
+          
+          # Create the browser storage module
+          cat > lib/browserStorage.js << 'STORAGE_EOF'
+          // Auto-generated browser storage adapter for GitHub Pages demo
+          
+          const STORAGE_PREFIX = 'wealth_tracker_';
+          
+          const storage = {
+            get: (key) => {
+              try {
+                const item = localStorage.getItem(STORAGE_PREFIX + key);
+                return item ? JSON.parse(item) : null;
+              } catch (e) {
+                console.error('Storage get error:', e);
+                return null;
+              }
+            },
+            
+            set: (key, value) => {
+              try {
+                localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
+                return true;
+              } catch (e) {
+                console.error('Storage set error:', e);
+                return false;
+              }
+            },
+            
+            remove: (key) => {
+              try {
+                localStorage.removeItem(STORAGE_PREFIX + key);
+                return true;
+              } catch (e) {
+                console.error('Storage remove error:', e);
+                return false;
+              }
+            },
+            
+            getAll: (prefix) => {
+              const result = {};
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith(STORAGE_PREFIX + prefix)) {
+                  const shortKey = key.replace(STORAGE_PREFIX, '');
+                  result[shortKey] = storage.get(shortKey.replace(prefix, ''));
+                }
+              }
+              return result;
+            }
+          };
+          
+          // Initialize with sample data if empty
+          const initSampleData = () => {
+            if (!storage.get('initialized')) {
+              storage.set('initialized', true);
+              storage.set('assets', [
+                {
+                  id: '1',
+                  name: 'Savings Account',
+                  type: 'Bank Account',
+                  value: 25000,
+                  currency: 'USD',
+                  icon: 'piggy-bank',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                },
+                {
+                  id: '2',
+                  name: 'Investment Portfolio',
+                  type: 'Investments',
+                  value: 50000,
+                  currency: 'USD',
+                  icon: 'trending-up',
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                }
+              ]);
+              storage.set('settings', {
+                currency: 'USD',
+                theme: 'dark',
+                locale: 'en-US'
+              });
+            }
+          };
+          
+          export const mockAPI = {
+            assets: {
+              getAll: () => Promise.resolve(storage.get('assets') || []),
+              getById: (id) => {
+                const assets = storage.get('assets') || [];
+                return Promise.resolve(assets.find(a => a.id === id) || null);
+              },
+              create: (asset) => {
+                const assets = storage.get('assets') || [];
+                const newAsset = {
+                  ...asset,
+                  id: Date.now().toString(),
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                };
+                assets.push(newAsset);
+                storage.set('assets', assets);
+                return Promise.resolve(newAsset);
+              },
+              update: (id, updates) => {
+                const assets = storage.get('assets') || [];
+                const index = assets.findIndex(a => a.id === id);
+                if (index >= 0) {
+                  assets[index] = { ...assets[index], ...updates, updatedAt: new Date().toISOString() };
+                  storage.set('assets', assets);
+                  return Promise.resolve(assets[index]);
+                }
+                return Promise.resolve(null);
+              },
+              delete: (id) => {
+                let assets = storage.get('assets') || [];
+                assets = assets.filter(a => a.id !== id);
+                storage.set('assets', assets);
+                return Promise.resolve({ success: true });
+              }
+            },
+            
+            settings: {
+              get: () => Promise.resolve(storage.get('settings') || { currency: 'USD', theme: 'dark' }),
+              update: (updates) => {
+                const current = storage.get('settings') || {};
+                const updated = { ...current, ...updates };
+                storage.set('settings', updated);
+                return Promise.resolve(updated);
+              }
+            },
+            
+            history: {
+              getAll: () => {
+                const assets = storage.get('assets') || [];
+                const totalValue = assets.reduce((sum, a) => sum + (a.value || 0), 0);
+                // Generate mock history data
+                const history = [];
+                for (let i = 30; i >= 0; i--) {
+                  const date = new Date();
+                  date.setDate(date.getDate() - i);
+                  history.push({
+                    date: date.toISOString(),
+                    totalValue: totalValue * (0.9 + Math.random() * 0.2),
+                    assetBreakdown: {}
+                  });
+                }
+                return Promise.resolve(history);
+              }
+            }
+          };
+          
+          // Initialize on load
+          if (typeof window !== 'undefined') {
+            initSampleData();
+          }
+          
+          export default mockAPI;
+          STORAGE_EOF
+
+      - name: Create API interceptor
+        working-directory: ./frontend/src
+        run: |
+          # Create an interceptor that replaces fetch calls
+          cat > lib/apiInterceptor.js << 'INTERCEPTOR_EOF'
+          import mockAPI from './browserStorage.js';
+          
+          const originalFetch = window.fetch;
+          
+          window.fetch = function(...args) {
+            const url = args[0];
+            const options = args[1] || {};
+            
+            // Intercept API calls
+            if (typeof url === 'string' && url.includes('/api/')) {
+              console.log('🔄 Intercepted API call:', url, options);
+              
+              // Assets endpoints
+              if (url.includes('/api/assets')) {
+                if (options.method === 'POST') {
+                  return mockAPI.assets.create(JSON.parse(options.body));
+                } else if (options.method === 'PUT' || options.method === 'PATCH') {
+                  const id = url.split('/').pop();
+                  return mockAPI.assets.update(id, JSON.parse(options.body));
+                } else if (options.method === 'DELETE') {
+                  const id = url.split('/').pop();
+                  return mockAPI.assets.delete(id);
+                } else {
+                  // GET
+                  if (url.match(/\/api\/assets\/[^/]+$/)) {
+                    const id = url.split('/').pop();
+                    return mockAPI.assets.getById(id).then(data => ({
+                      ok: true,
+                      json: () => Promise.resolve(data)
+                    }));
+                  }
+                  return mockAPI.assets.getAll().then(data => ({
+                    ok: true,
+                    json: () => Promise.resolve(data)
+                  }));
+                }
+              }
+              
+              // Settings endpoints
+              if (url.includes('/api/settings')) {
+                if (options.method === 'PUT' || options.method === 'PATCH' || options.method === 'POST') {
+                  return mockAPI.settings.update(JSON.parse(options.body)).then(data => ({
+                    ok: true,
+                    json: () => Promise.resolve(data)
+                  }));
+                } else {
+                  return mockAPI.settings.get().then(data => ({
+                    ok: true,
+                    json: () => Promise.resolve(data)
+                  }));
+                }
+              }
+              
+              // History endpoints
+              if (url.includes('/api/history')) {
+                return mockAPI.history.getAll().then(data => ({
+                  ok: true,
+                  json: () => Promise.resolve(data)
+                }));
+              }
+              
+              // For axios-style responses, wrap in a Promise
+              return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve({ message: 'Intercepted by browser storage' })
+              });
+            }
+            
+            // Pass through non-API calls
+            return originalFetch.apply(this, args);
+          };
+          
+          console.log('✅ Browser storage API interceptor loaded');
+          INTERCEPTOR_EOF
+
+      - name: Inject interceptor into entry point
+        working-directory: ./frontend/src
+        run: |
+          # Find the main entry file (main.jsx, main.tsx, index.jsx, etc.)
+          ENTRY_FILE=$(find . -maxdepth 1 -name "main.*" -o -name "index.*" | head -1)
+          
+          if [ -z "$ENTRY_FILE" ]; then
+            echo "⚠️  Could not find entry file, creating main.jsx"
+            ENTRY_FILE="main.jsx"
+          fi
+          
+          echo "📝 Injecting interceptor into: $ENTRY_FILE"
+          
+          # Create a backup
+          cp "$ENTRY_FILE" "${ENTRY_FILE}.backup"
+          
+          # Add import at the top of the file
+          echo "import './lib/apiInterceptor.js';" | cat - "$ENTRY_FILE" > temp && mv temp "$ENTRY_FILE"
+          
+          echo "✅ Interceptor injected"
+
+      - name: Update Vite config for GitHub Pages
+        working-directory: ./frontend
+        run: |
+          # Update or create vite.config with correct base path
+          if [ -f "vite.config.js" ] || [ -f "vite.config.ts" ]; then
+            CONFIG_FILE=$(ls vite.config.* | head -1)
+            
+            # Backup original
+            cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
+            
+            # Update base path
+            sed -i "s|base: ['\"].*['\"]|base: process.env.GITHUB_REPOSITORY ? \`/\${process.env.GITHUB_REPOSITORY.split('/')[1]}/\` : '/'|g" "$CONFIG_FILE" || \
+            sed -i "/export default defineConfig/a\  base: process.env.GITHUB_REPOSITORY ? \`/\${process.env.GITHUB_REPOSITORY.split('/')[1]}/\` : '/',\\" "$CONFIG_FILE"
+          fi
+
+      - name: Build
+        working-directory: ./frontend
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          npm run build
+          
+          # Add a notice to the built index.html
+          if [ -f "dist/index.html" ]; then
+            sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' dist/index.html
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './frontend/dist'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
