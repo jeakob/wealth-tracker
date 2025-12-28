@@ -360,18 +360,62 @@ jobs:
 
       - name: Update Vite config for GitHub Pages
         working-directory: ./frontend
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          # Update or create vite.config with correct base path
-          if [ -f "vite.config.js" ] || [ -f "vite.config.ts" ]; then
-            CONFIG_FILE=$(ls vite.config.* | head -1)
-            
-            # Backup original
-            cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-            
-            # Update base path
-            sed -i "s|base: ['\"].*['\"]|base: process.env.GITHUB_REPOSITORY ? \`/\${process.env.GITHUB_REPOSITORY.split('/')[1]}/\` : '/'|g" "$CONFIG_FILE" || \
-            sed -i "/export default defineConfig/a\  base: process.env.GITHUB_REPOSITORY ? \`/\${process.env.GITHUB_REPOSITORY.split('/')[1]}/\` : '/',\\" "$CONFIG_FILE"
+          echo "📝 Updating Vite config for GitHub Pages..."
+          
+          # Find the config file
+          if [ -f "vite.config.js" ]; then
+            CONFIG_FILE="vite.config.js"
+          elif [ -f "vite.config.ts" ]; then
+            CONFIG_FILE="vite.config.ts"
+          else
+            echo "⚠️ No vite.config found, creating one"
+            cat > vite.config.js << 'VITE_EOF'
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  base: '/wealth-tracker/',
+  build: {
+    outDir: 'build',
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+})
+VITE_EOF
+            echo "✅ Created new vite.config.js"
+            exit 0
           fi
+          
+          echo "📄 Original config:"
+          cat "$CONFIG_FILE"
+          
+          # Backup original
+          cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
+          
+          # Extract repo name from GITHUB_REPOSITORY
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          echo "🔧 Setting base path to: /$REPO_NAME/"
+          
+          # Check if base is already set and update it, or add it
+          if grep -q "base:" "$CONFIG_FILE"; then
+            # Replace existing base
+            sed -i "s|base:.*|base: '/$REPO_NAME/',|g" "$CONFIG_FILE"
+          else
+            # Add base after defineConfig({
+            sed -i "/defineConfig({/a\  base: '/$REPO_NAME/'," "$CONFIG_FILE"
+          fi
+          
+          echo "✅ Updated vite.config"
+          echo "📄 New config:"
+          cat "$CONFIG_FILE"
 
       - name: Build
         working-directory: ./frontend
