@@ -8,7 +8,7 @@ Managing your personal finances shouldn't feel like a chore. **Wealth Tracker** 
 
 ---
 
-### 📸 A Look Inside
+### Screenshots
 
 | **Your Financial Dashboard** |
 |:---:|
@@ -38,7 +38,7 @@ I built Wealth Tracker because I wanted a **simple, private, and fast** way to t
     *   **Net Worth Evolution:** A Stacked Bar Chart grouping your history by asset type or currency.
     *   **Asset Allocation:** A Donut Chart showing exactly where your money is.
 
-## 🛠 Tech Stack
+## Tech Stack
 
 We've recently overhauled the frontend for maximum performance and developer experience:
 
@@ -48,11 +48,11 @@ We've recently overhauled the frontend for maximum performance and developer exp
 -   **Icons:** [Lucide React](https://lucide.dev/)
 -   **Backend:** NestJS + TypeORM + PostgreSQL (Solid, reliable, type-safe).
 
-## 🚀 Getting Started
+## Getting Started
 
 1.  **Clone the repo:**
     ```bash
-    git clone https://github.com/yourusername/wealth-tracker.git
+    git clone https://github.com/jeakob/wealth-tracker.git
     cd wealth-tracker
     ```
 
@@ -68,4 +68,4 @@ We've recently overhauled the frontend for maximum performance and developer exp
 
 ---
 
-*Enjoy tracking your journey to financial freedom!* 🚀
+*Enjoy tracking your journey to financial freedom!* 
