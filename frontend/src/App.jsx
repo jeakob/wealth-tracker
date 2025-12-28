@@ -35,7 +35,6 @@ function AppContent() {
   const fetchAssets = async () => {
     try {
       const data = await getAssets();
-      data.sort((a, b) => new Date(b.date) - new Date(a.date));
       setAssets(data);
     } catch (e) {
       console.error(e);
