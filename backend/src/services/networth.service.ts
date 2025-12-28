@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { NetWorthSnapshot } from '../entities/networth.entity';
 import { Asset } from '../entities/asset.entity';
 import { Liability } from '../entities/liability.entity';
+import { BankAccount } from '../entities/bankaccount.entity';
 
 @Injectable()
 export class NetWorthService {
@@ -14,6 +15,8 @@ export class NetWorthService {
         private assetRepo: Repository<Asset>,
         @InjectRepository(Liability)
         private liabilityRepo: Repository<Liability>,
+        @InjectRepository(BankAccount)
+        private bankAccountRepo: Repository<BankAccount>,
     ) { }
 
     async syncSnapshots(newAsset?: Asset) {
@@ -29,19 +32,30 @@ export class NetWorthService {
             }
         }
 
-        const liabilities = await this.liabilityRepo.find();
+        // Exclude "Bank Account" type assets since we handle bank accounts separately
+        assets = assets.filter(a => a.type !== 'Bank Account');
 
-        if (assets.length === 0 && liabilities.length === 0) {
+        const liabilities = await this.liabilityRepo.find();
+        const bankAccounts = await this.bankAccountRepo.find();
+
+        if (assets.length === 0 && liabilities.length === 0 && bankAccounts.length === 0) {
             await this.snapshotRepo.clear();
             return [];
         }
 
-        // Get all unique dates from assets, set to start of day
-        const dates = Array.from(new Set(assets.map(a => {
-            const d = new Date(a.date);
-            d.setHours(0, 0, 0, 0);
-            return d.getTime();
-        }))).sort((a, b) => a - b);
+        // Get all unique dates from assets and bank accounts, set to start of day
+        const dates = Array.from(new Set([
+            ...assets.map(a => {
+                const d = new Date(a.date);
+                d.setHours(0, 0, 0, 0);
+                return d.getTime();
+            }),
+            ...bankAccounts.map(b => {
+                const d = new Date(b.initialDate);
+                d.setHours(0, 0, 0, 0);
+                return d.getTime();
+            })
+        ])).sort((a, b) => a - b);
 
         // Add Liability creation dates if we want full history, but for now defaulting to asset-driven dates + today.
 
@@ -66,6 +80,16 @@ export class NetWorthService {
                 })
                 .reduce((sum, a) => sum + Number(a.value), 0);
 
+            // Add bank account initial balances where initialDate <= this date
+            // For dates before a bank account's initial date, it won't be included
+            const totalBankAccounts = bankAccounts
+                .filter(b => {
+                    const bankDate = new Date(b.initialDate);
+                    bankDate.setHours(0, 0, 0, 0);
+                    return bankDate <= date;
+                })
+                .reduce((sum, b) => sum + Number(b.initialBalance), 0);
+
             // Subtract included liabilities
             // NOTE: Liability 'createdAt' could be used for historical accuracy, 
             // but for simplicity we'll subtract current liabilities from all active snapshots 
@@ -83,7 +107,7 @@ export class NetWorthService {
                 })
                 .reduce((sum, l) => sum + Number(l.balance), 0);
 
-            const total = totalAssets - totalLiabilities;
+            const total = totalAssets + totalBankAccounts - totalLiabilities;
 
 
             let snapshot = await this.snapshotRepo.findOne({ where: { snapshot_date: date } });

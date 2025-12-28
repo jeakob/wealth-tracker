@@ -6,9 +6,10 @@ import { NetWorthService } from '../services/networth.service';
 import { NetWorthController } from '../controllers/networth.controller';
 
 import { Liability } from '../entities/liability.entity';
+import { BankAccount } from '../entities/bankaccount.entity';
 
 @Module({
-    imports: [TypeOrmModule.forFeature([NetWorthSnapshot, Asset, Liability])],
+    imports: [TypeOrmModule.forFeature([NetWorthSnapshot, Asset, Liability, BankAccount])],
     providers: [NetWorthService],
     controllers: [NetWorthController],
     exports: [NetWorthService],
