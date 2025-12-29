@@ -22,7 +22,7 @@ import {
 import { toast } from 'sonner';
 import { UserPlus, Trash2, Key, Edit } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+import { API_URL } from '../config';
 
 export default function UserManagementPage() {
     const [users, setUsers] = useState([]);
@@ -153,16 +153,16 @@ export default function UserManagementPage() {
                                 <td className="p-4 font-medium">{user.username}</td>
                                 <td className="p-4">
                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.role === 'admin'
-                                            ? 'bg-purple-500/20 text-purple-400'
-                                            : 'bg-blue-500/20 text-blue-400'
+                                        ? 'bg-purple-500/20 text-purple-400'
+                                        : 'bg-blue-500/20 text-blue-400'
                                         }`}>
                                         {user.role}
                                     </span>
                                 </td>
                                 <td className="p-4">
                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${user.is_active
-                                            ? 'bg-green-500/20 text-green-400'
-                                            : 'bg-red-500/20 text-red-400'
+                                        ? 'bg-green-500/20 text-green-400'
+                                        : 'bg-red-500/20 text-red-400'
                                         }`}>
                                         {user.is_active ? 'Active' : 'Inactive'}
                                     </span>
