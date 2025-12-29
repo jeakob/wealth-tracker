@@ -13,7 +13,7 @@ export class BankAccount {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @Column({ unique: true })
+  @Column()
   name: string;
 
   @Column('decimal', { precision: 10, scale: 2, default: 0 })
