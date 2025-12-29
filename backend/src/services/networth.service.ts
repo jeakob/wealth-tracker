@@ -47,15 +47,20 @@ export class NetWorthService {
         const dates = Array.from(new Set([
             ...assets.map(a => {
                 const d = new Date(a.date);
+                if (isNaN(d.getTime())) return null; // Skip invalid dates
                 d.setHours(0, 0, 0, 0);
                 return d.getTime();
             }),
             ...bankAccounts.map(b => {
+                // Ensure initialDate is treated as date
                 const d = new Date(b.initialDate);
+                if (isNaN(d.getTime())) return null;
                 d.setHours(0, 0, 0, 0);
                 return d.getTime();
             })
-        ])).sort((a, b) => a - b);
+        ])).filter(t => t !== null).sort((a, b) => a - b);
+
+        console.log(`[SyncSnapshots] UserId: ${userId}. Dates found: ${dates.length}. Assets: ${assets.length}, BankAccounts: ${bankAccounts.length}`);
 
         // Add Liability creation dates if we want full history, but for now defaulting to asset-driven dates + today.
 

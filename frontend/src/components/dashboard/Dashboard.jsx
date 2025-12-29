@@ -169,10 +169,25 @@ const Dashboard = ({ assets, defaultCurrency = 'USD' }) => {
                                             ))}
                                         </Pie>
                                         <Tooltip
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    const data = payload[0];
+                                                    return (
+                                                        <div className="rounded-lg border bg-card p-2 shadow-sm">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                                                    {pluralizeAssetType(data.name)}
+                                                                </span>
+                                                                <span className="font-bold text-foreground">
+                                                                    {formatMoney(data.value)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
                                             cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
-                                            labelFormatter={(label) => pluralizeAssetType(label)}
-                                            formatter={(value, name) => [formatMoney(value), pluralizeAssetType(name)]}
-                                            contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }}
                                         />
                                     </PieChart>
                                 </ResponsiveContainer>

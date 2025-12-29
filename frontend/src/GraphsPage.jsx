@@ -37,7 +37,7 @@ const CURRENCY_SYMBOLS = {
 // Custom Tooltip Component for Pie Chart
 const CustomPieTooltip = ({ active, payload, symbol }) => {
   if (active && payload && payload.length) {
-    const data = payload[0];
+    const data = payload[0].payload || payload[0];
     return (
       <div style={{
         backgroundColor: 'hsl(var(--card))',
