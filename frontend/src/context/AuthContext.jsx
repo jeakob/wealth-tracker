@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
+import { API_URL } from '../config';
 
 const AuthContext = createContext(null);
 
@@ -30,7 +31,7 @@ export const AuthProvider = ({ children }) => {
 
     const loadUser = async () => {
         try {
-            const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/me`);
+            const response = await axios.get(`${API_URL}/auth/me`);
             setUser(response.data);
         } catch (error) {
             console.error('Failed to load user:', error);
@@ -42,7 +43,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (username, password) => {
         try {
-            const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/login`, {
+            const response = await axios.post(`${API_URL}/auth/login`, {
                 username,
                 password,
             });
@@ -73,7 +74,7 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (username, password, role) => {
         try {
-            await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/auth/register`, {
+            await axios.post(`${API_URL}/auth/register`, {
                 username,
                 password,
                 role,

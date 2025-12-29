@@ -1,6 +1,5 @@
 import axios from 'axios';
-
-const API_URL = window.RUNTIME_CONFIG?.API_URL || 'http://localhost:4000';
+import { API_URL } from '../config';
 
 export const getBankAccounts = async () => {
   const response = await axios.get(`${API_URL}/bankaccounts`);
