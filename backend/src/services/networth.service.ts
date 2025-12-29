@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { NetWorthSnapshot } from '../entities/networth.entity';
 import { Asset } from '../entities/asset.entity';
 import { Liability } from '../entities/liability.entity';
@@ -118,18 +118,27 @@ export class NetWorthService {
             const total = totalAssets + totalBankAccounts - totalLiabilities;
 
 
+            // Use a range to find existing snapshot for the day to avoid time component mismatches
+            const startOfDay = new Date(date);
+            startOfDay.setHours(0, 0, 0, 0);
+
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+
             let snapshot = await this.snapshotRepo.findOne({
                 where: {
-                    snapshot_date: date,
+                    snapshot_date: Between(startOfDay, endOfDay),
                     user_id: userId
                 }
             });
 
             if (snapshot) {
                 snapshot.total = total;
+                // Normalize date to start of day just in case
+                snapshot.snapshot_date = startOfDay;
             } else {
                 snapshot = this.snapshotRepo.create({
-                    snapshot_date: date,
+                    snapshot_date: startOfDay,
                     total,
                     user_id: userId
                 });
