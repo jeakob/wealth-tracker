@@ -3,7 +3,7 @@ name: Build and Push Docker Images
 on:
   push:
     branches:
-      - '**'  # Triggers on all branches
+      - 'auth'  # Triggers on all branches
 
 env:
   DOCKER_USERNAME: jeakob
