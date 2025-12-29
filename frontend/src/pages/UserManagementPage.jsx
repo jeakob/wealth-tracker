@@ -185,18 +185,39 @@ export default function UserManagementPage() {
                                             Change Password
                                         </Button>
                                         {user.id !== currentUser?.id && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    setSelectedUser(user);
-                                                    setDeleteDialogOpen(true);
-                                                }}
-                                                className="gap-1 text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                                Delete
-                                            </Button>
+                                            <>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={async () => {
+                                                        try {
+                                                            await axios.patch(`${API_URL}/users/${user.id}`, {
+                                                                is_active: !user.is_active
+                                                            });
+                                                            toast.success(`User ${user.is_active ? 'disabled' : 'enabled'} successfully`);
+                                                            fetchUsers();
+                                                        } catch (error) {
+                                                            toast.error('Failed to update user status');
+                                                        }
+                                                    }}
+                                                    className={`gap-1 ${user.is_active ? 'text-orange-400 hover:text-orange-300 hover:bg-orange-500/10' : 'text-green-400 hover:text-green-300 hover:bg-green-500/10'}`}
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                    {user.is_active ? 'Disable' : 'Enable'}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        setSelectedUser(user);
+                                                        setDeleteDialogOpen(true);
+                                                    }}
+                                                    className="gap-1 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                    Delete
+                                                </Button>
+                                            </>
                                         )}
                                     </div>
                                 </td>
@@ -306,6 +327,6 @@ export default function UserManagementPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     );
 }

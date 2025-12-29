@@ -80,9 +80,7 @@ export class UsersService {
 
     async delete(id: number): Promise<void> {
         const user = await this.findOne(id);
-
-        // Soft delete by setting is_active to false
-        user.is_active = false;
-        await this.userRepository.save(user);
+        // Hard delete - @ManyToOne with cascade will handle related entities
+        await this.userRepository.remove(user);
     }
 }
