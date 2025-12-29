@@ -7,6 +7,7 @@ import { AssetModule } from './asset.module';
 import { NetWorthModule } from './networth.module';
 
 import { LiabilityModule } from './liability.module';
+import { UsersModule } from './users.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { LiabilityModule } from './liability.module';
     AssetModule,
     NetWorthModule,
     LiabilityModule,
+    UsersModule,
   ],
 })
 export class AppModule { }
