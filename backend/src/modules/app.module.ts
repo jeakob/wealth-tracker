@@ -30,6 +30,7 @@ import { SettingsModule } from '../settings/settings.module';
     AssetModule,
     NetWorthModule,
     LiabilityModule,
+    SettingsModule,
   ],
 })
 export class AppModule { }
