@@ -95,7 +95,7 @@ function SettingsPage({ defaultCurrency, setDefaultCurrency }) {
                 Select the currency used by default when adding new assets.
               </p>
             </div>
-            <Select value={defaultCurrency} onValueChange={setDefaultCurrency}>
+            <Select value={defaultCurrency} onValueChange={(val) => setDefaultCurrency(val)}>
               <SelectTrigger className="w-[100px]">
                 <SelectValue />
               </SelectTrigger>

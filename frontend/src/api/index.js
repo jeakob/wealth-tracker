@@ -75,3 +75,13 @@ export const deleteLiability = async (id) => {
   const res = await axios.delete(`${API_URL}/liabilities/${id}`);
   return res.data;
 };
+
+export const getSettings = async () => {
+  const res = await axios.get(`${API_URL}/settings`);
+  return res.data;
+};
+
+export const updateSetting = async (key, value) => {
+  const res = await axios.post(`${API_URL}/settings`, { key, value });
+  return res.data;
+};

@@ -8,6 +8,7 @@ import { NetWorthModule } from './networth.module';
 import { LiabilityModule } from './liability.module';
 import { UsersModule } from './users.module';
 import { SeedModule } from './seed.module';
+import { SettingsModule } from '../settings/settings.module';
 
 @Module({
   imports: [

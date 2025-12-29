@@ -13,20 +13,49 @@ import LiabilitiesPage from './LiabilitiesPage';
 import AddAssetPage from './AddAssetPage';
 import LoginPage from './pages/LoginPage';
 import UserManagementPage from './pages/UserManagementPage';
-import { getBankAccounts, getAssets, addAsset, updateAsset, deleteAsset } from './api/index';
+import { getBankAccounts, getAssets, addAsset, updateAsset, deleteAsset, getSettings, updateSetting } from './api/index';
 // Styles are now via index.css/tailwind
 
 function AppContent() {
   const [assets, setAssets] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
   const [editingAsset, setEditingAsset] = useState(null);
-  const [defaultCurrency, setDefaultCurrency] = useState(() => localStorage.getItem('defaultCurrency') || 'USD');
+  const [defaultCurrency, setDefaultCurrencyState] = useState('USD');
   const location = useLocation();
   const { isAuthenticated } = useAuth();
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
+  // Fetch settings on login
   useEffect(() => {
-    localStorage.setItem('defaultCurrency', defaultCurrency);
-  }, [defaultCurrency]);
+    if (isAuthenticated) {
+      fetchSettings();
+      fetchData();
+    }
+  }, [isAuthenticated]);
+
+  const fetchSettings = async () => {
+    try {
+      const settings = await getSettings();
+      if (settings?.defaultCurrency) {
+        setDefaultCurrencyState(settings.defaultCurrency);
+      }
+    } catch (e) {
+      console.error('Failed to fetch settings:', e);
+    } finally {
+      setSettingsLoaded(true);
+    }
+  };
+
+  const setDefaultCurrency = async (currency) => {
+    try {
+      // Optimistic update
+      setDefaultCurrencyState(currency);
+      await updateSetting('defaultCurrency', currency);
+    } catch (e) {
+      console.error('Failed to save setting:', e);
+      // Revert if needed, but for now simple logging
+    }
+  };
 
   // Fetch logic
   useEffect(() => {
