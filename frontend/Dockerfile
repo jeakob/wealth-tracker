@@ -1,13 +1,13 @@
 # Frontend Dockerfile
 FROM node:20-alpine3.22 AS build
 WORKDIR /app
-COPY frontend/package*.json ./
+COPY package*.json ./
 RUN npm install --frozen-lockfile
 
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
-COPY frontend .
+COPY . .
 RUN npm run build
 
 FROM node:20-alpine3.22 AS prod
