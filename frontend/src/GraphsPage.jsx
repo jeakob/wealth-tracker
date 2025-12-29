@@ -34,27 +34,6 @@ const CURRENCY_SYMBOLS = {
   'ETH': 'Ξ'
 };
 
-// Custom Tooltip Component for Pie Chart
-const CustomPieTooltip = ({ active, payload, symbol }) => {
-  if (active && payload && payload.length) {
-    const data = payload[0];
-    return (
-      <div style={{
-        backgroundColor: 'hsl(var(--card))',
-        border: '1px solid hsl(var(--border))',
-        borderRadius: 'var(--radius)',
-        padding: '8px 12px',
-        color: 'hsl(var(--foreground))'
-      }}>
-        <p style={{ margin: 0, fontWeight: 500 }}>
-          {pluralizeAssetType(data.name)}: {symbol}{data.value.toLocaleString()}
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
 function GraphsPage({ assets, defaultCurrency = 'USD' }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -341,13 +320,20 @@ function GraphsPage({ assets, defaultCurrency = 'USD' }) {
                         outerRadius={100}
                         paddingAngle={2}
                         dataKey="value"
-                        nameKey="name"
                       >
                         {allocationData.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
                         ))}
                       </Pie>
-                      <Tooltip content={<CustomPieTooltip symbol={symbol} />} />
+                      <Tooltip
+                        formatter={(value, name) => [`${symbol}${value.toLocaleString()}`, pluralizeAssetType(name)]}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          borderColor: 'hsl(var(--border))',
+                          borderRadius: 'var(--radius)',
+                          color: 'hsl(var(--foreground))'
+                        }}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                   {/* Total Net Worth Center Label */}

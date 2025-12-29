@@ -162,7 +162,6 @@ const Dashboard = ({ assets, defaultCurrency = 'USD' }) => {
                                             outerRadius={80}
                                             paddingAngle={5}
                                             dataKey="value"
-                                            nameKey="name"
                                         >
                                             {categoryData.map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
@@ -171,7 +170,7 @@ const Dashboard = ({ assets, defaultCurrency = 'USD' }) => {
                                         <Tooltip
                                             cursor={{ fill: 'rgba(255, 255, 255, 0.1)' }}
                                             labelFormatter={(label) => pluralizeAssetType(label)}
-                                            formatter={(value, name) => [formatMoney(value), pluralizeAssetType(name)]}
+                                            formatter={(value) => [formatMoney(value), 'Value']}
                                             contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)', color: 'hsl(var(--foreground))' }}
                                         />
                                     </PieChart>
