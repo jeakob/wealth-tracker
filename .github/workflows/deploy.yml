@@ -1,4 +1,4 @@
-name: Deploy Demo to GitHub Pages
+name: Deploy Read-Only Demo to GitHub Pages
 
 on:
   push:
@@ -36,285 +36,137 @@ jobs:
         working-directory: ./frontend
         run: npm ci
 
-      - name: Create browser storage adapter
+      - name: Remove backend dependencies
         working-directory: ./frontend
         run: |
-          echo "📁 Current directory structure:"
-          ls -la
-          
-          # Check if src exists, if not try to find where the source files are
-          if [ -d "src" ]; then
-            echo "✅ src/ directory found"
-            SRC_DIR="src"
-          elif [ -d "app" ]; then
-            echo "✅ app/ directory found (Next.js style)"
-            SRC_DIR="app"
-          else
-            echo "⚠️  Creating src/ directory"
-            mkdir -p src
-            SRC_DIR="src"
-          fi
-          
-          # Create lib directory if it doesn't exist
-          mkdir -p "$SRC_DIR/lib"
-          
-          # Create the browser storage module
-          cat > "$SRC_DIR/lib/browserStorage.js" << 'STORAGE_EOF'
-          // Auto-generated browser storage adapter for GitHub Pages demo
-          
-          const STORAGE_PREFIX = 'wealth_tracker_';
-          
-          const storage = {
-            get: (key) => {
-              try {
-                const item = localStorage.getItem(STORAGE_PREFIX + key);
-                return item ? JSON.parse(item) : null;
-              } catch (e) {
-                console.error('Storage get error:', e);
-                return null;
-              }
-            },
-            
-            set: (key, value) => {
-              try {
-                localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
-                console.log('💾 Saved to storage:', key, value);
-                return true;
-              } catch (e) {
-                console.error('Storage set error:', e);
-                return false;
-              }
-            },
-            
-            remove: (key) => {
-              try {
-                localStorage.removeItem(STORAGE_PREFIX + key);
-                return true;
-              } catch (e) {
-                console.error('Storage remove error:', e);
-                return false;
-              }
-            },
-            
-            getAll: (prefix) => {
-              const result = {};
-              for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith(STORAGE_PREFIX + prefix)) {
-                  const shortKey = key.replace(STORAGE_PREFIX, '');
-                  result[shortKey] = storage.get(shortKey.replace(prefix, ''));
-                }
-              }
-              return result;
-            }
-          };
-          
-          // Initialize with sample data if empty
-          const initSampleData = () => {
-            if (!storage.get('initialized')) {
-              console.log('🎬 Initializing sample data...');
-              storage.set('initialized', true);
-              storage.set('assets', [
-                {
-                  id: '1',
-                  name: 'Savings Account',
-                  type: 'Bank Account',
-                  value: 25000,
-                  currency: 'USD',
-                  icon: 'piggy-bank',
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                },
-                {
-                  id: '2',
-                  name: 'Investment Portfolio',
-                  type: 'Investments',
-                  value: 50000,
-                  currency: 'USD',
-                  icon: 'trending-up',
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                }
-              ]);
-              storage.set('settings', {
-                currency: 'USD',
-                theme: 'dark',
-                locale: 'en-US'
-              });
-              
-              // Pre-generate net worth snapshots to avoid chart rendering issues
-              const now = new Date();
-              const snapshots = [];
-              for (let i = 11; i >= 0; i--) {
-                const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const value = 75000 * (0.85 + Math.random() * 0.3);
-                snapshots.push({
-                  id: 12 - i,
-                  date: date.toISOString(),
-                  totalAssets: Math.round(value * 100) / 100,
-                  totalLiabilities: 0,
-                  netWorth: Math.round(value * 100) / 100,
-                  createdAt: date.toISOString(),
-                  updatedAt: date.toISOString()
-                });
-              }
-              storage.set('netWorthSnapshots', snapshots);
-              
-              console.log('✅ Sample data initialized with snapshots');
-            }
-          };
-          
-          export const mockAPI = {
-            assets: {
-              getAll: () => {
-                const assets = storage.get('assets') || [];
-                console.log('📋 Getting all assets:', assets.length);
-                return Promise.resolve(assets);
-              },
-              getById: (id) => {
-                const assets = storage.get('assets') || [];
-                const asset = assets.find(a => a.id === id) || null;
-                console.log('🔍 Getting asset by id:', id, asset);
-                return Promise.resolve(asset);
-              },
-              create: (asset) => {
-                console.log('➕ Creating asset:', asset);
-                const assets = storage.get('assets') || [];
-                const newAsset = {
-                  ...asset,
-                  id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                };
-                assets.push(newAsset);
-                storage.set('assets', assets);
-                console.log('✅ Asset created:', newAsset);
-                return Promise.resolve(newAsset);
-              },
-              update: (id, updates) => {
-                console.log('📝 Updating asset:', id, updates);
-                const assets = storage.get('assets') || [];
-                const index = assets.findIndex(a => a.id === id);
-                if (index >= 0) {
-                  assets[index] = { ...assets[index], ...updates, updatedAt: new Date().toISOString() };
-                  storage.set('assets', assets);
-                  console.log('✅ Asset updated:', assets[index]);
-                  return Promise.resolve(assets[index]);
-                }
-                console.warn('⚠️ Asset not found:', id);
-                return Promise.resolve(null);
-              },
-              delete: (id) => {
-                console.log('🗑️ Deleting asset:', id);
-                let assets = storage.get('assets') || [];
-                const initialLength = assets.length;
-                assets = assets.filter(a => a.id !== id);
-                storage.set('assets', assets);
-                console.log('✅ Asset deleted, remaining:', assets.length);
-                return Promise.resolve({ success: true, deleted: initialLength !== assets.length });
-              }
-            },
-            
-            settings: {
-              get: () => {
-                const settings = storage.get('settings') || { currency: 'USD', theme: 'dark' };
-                console.log('⚙️ Getting settings:', settings);
-                return Promise.resolve(settings);
-              },
-              update: (updates) => {
-                console.log('⚙️ Updating settings:', updates);
-                const current = storage.get('settings') || {};
-                const updated = { ...current, ...updates };
-                storage.set('settings', updated);
-                console.log('✅ Settings updated:', updated);
-                return Promise.resolve(updated);
-              }
-            },
-            
-            history: {
-              getAll: () => {
-                const assets = storage.get('assets') || [];
-                const totalValue = assets.reduce((sum, a) => sum + (parseFloat(a.value) || 0), 0);
-                // Generate mock history data
-                const history = [];
-                for (let i = 30; i >= 0; i--) {
-                  const date = new Date();
-                  date.setDate(date.getDate() - i);
-                  history.push({
-                    date: date.toISOString(),
-                    totalValue: totalValue * (0.9 + Math.random() * 0.2),
-                    assetBreakdown: {}
-                  });
-                }
-                console.log('📊 Getting history:', history.length, 'entries');
-                return Promise.resolve(history);
-              }
-            },
-            
-            netWorth: {
-              getSnapshots: () => {
-                const assets = storage.get('assets') || [];
-                const totalValue = assets.reduce((sum, a) => sum + (parseFloat(a.value) || 0), 0);
-                
-                // Generate snapshots for the last 12 months
-                const snapshots = [];
-                const now = new Date();
-                
-                for (let i = 11; i >= 0; i--) {
-                  const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                  const variation = 0.85 + (Math.random() * 0.3); // Random variation between 0.85 and 1.15
-                  const value = Math.round(totalValue * variation * 100) / 100;
-                  
-                  snapshots.push({
-                    id: i + 1,
-                    // Provide the date in ISO format which is most commonly used
-                    date: date.toISOString(),
-                    totalAssets: value,
-                    totalLiabilities: 0,
-                    netWorth: value,
-                    createdAt: date.toISOString(),
-                    updatedAt: date.toISOString()
-                  });
-                }
-                
-                console.log('📊 Getting net worth snapshots:', snapshots.length, 'entries');
-                console.log('📊 First snapshot:', JSON.stringify(snapshots[0], null, 2));
-                console.log('📊 Last snapshot:', JSON.stringify(snapshots[snapshots.length - 1], null, 2));
-                return Promise.resolve(snapshots);
-              }
-            }
-          };
-          
-          // Initialize on load
-          if (typeof window !== 'undefined') {
-            initSampleData();
-          }
-          
-          export default mockAPI;
-          STORAGE_EOF
+          echo "🗑️ Removing backend configuration..."
+          # Remove any API base URL configurations
+          find src -type f \( -name "*.js" -o -name "*.jsx" -o -name "*.ts" -o -name "*.tsx" \) -exec sed -i 's|http://localhost:4000||g' {} \;
 
-      - name: Create API interceptor
+      - name: Create read-only demo data
         working-directory: ./frontend
         run: |
-          # Use the same SRC_DIR we found earlier
-          if [ -d "src" ]; then
-            SRC_DIR="src"
-          elif [ -d "app" ]; then
-            SRC_DIR="app"
-          else
-            SRC_DIR="src"
-          fi
+          echo "📝 Creating demo data module..."
+          mkdir -p src/lib
           
-          # Create an interceptor that replaces fetch calls
-          cat > "$SRC_DIR/lib/apiInterceptor.js" << 'INTERCEPTOR_EOF'
-          import mockAPI from './browserStorage.js';
+          cat > src/lib/demoData.js << 'DEMO_EOF'
+          // Read-only demo data for GitHub Pages
           
-          const originalFetch = window.fetch;
+          const DEMO_ASSETS = [
+            {
+              id: '1',
+              name: 'Primary Savings Account',
+              type: 'Savings Account',
+              value: 45000,
+              currency: 'GBP',
+              icon: 'piggy-bank',
+              createdAt: '2024-01-15T10:00:00.000Z',
+              updatedAt: '2024-12-28T10:00:00.000Z'
+            },
+            {
+              id: '2',
+              name: 'Stocks & Shares ISA',
+              type: 'Investment',
+              value: 125000,
+              currency: 'GBP',
+              icon: 'trending-up',
+              createdAt: '2024-03-20T10:00:00.000Z',
+              updatedAt: '2024-12-28T10:00:00.000Z'
+            },
+            {
+              id: '3',
+              name: 'Pension Fund',
+              type: 'Pension',
+              value: 87500,
+              currency: 'GBP',
+              icon: 'briefcase',
+              createdAt: '2024-02-10T10:00:00.000Z',
+              updatedAt: '2024-12-28T10:00:00.000Z'
+            },
+            {
+              id: '4',
+              name: 'Emergency Fund',
+              type: 'Savings Account',
+              value: 15000,
+              currency: 'GBP',
+              icon: 'shield',
+              createdAt: '2024-01-05T10:00:00.000Z',
+              updatedAt: '2024-12-28T10:00:00.000Z'
+            },
+            {
+              id: '5',
+              name: 'Cryptocurrency Portfolio',
+              type: 'Cryptocurrency',
+              value: 8500,
+              currency: 'GBP',
+              icon: 'bitcoin',
+              createdAt: '2024-06-15T10:00:00.000Z',
+              updatedAt: '2024-12-28T10:00:00.000Z'
+            },
+            {
+              id: '6',
+              name: 'Premium Bonds',
+              type: 'Investment',
+              value: 25000,
+              currency: 'GBP',
+              icon: 'award',
+              createdAt: '2024-04-01T10:00:00.000Z',
+              updatedAt: '2024-12-28T10:00:00.000Z'
+            }
+          ];
           
-          // Helper to check if URL should be intercepted
+          // Generate realistic net worth snapshots for the past 12 months
+          const generateSnapshots = () => {
+            const snapshots = [];
+            const now = new Date();
+            const baseValue = 306000; // Total of all assets
+            
+            for (let i = 11; i >= 0; i--) {
+              const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+              // Simulate gradual growth with some volatility
+              const monthProgress = (11 - i) / 11;
+              const growth = monthProgress * 0.15; // 15% growth over the year
+              const volatility = (Math.random() - 0.5) * 0.03; // ±1.5% random variation
+              const value = Math.round(baseValue * (0.85 + growth + volatility));
+              
+              snapshots.push({
+                id: 12 - i,
+                date: date.toISOString(),
+                totalAssets: value,
+                totalLiabilities: 0,
+                netWorth: value,
+                createdAt: date.toISOString(),
+                updatedAt: date.toISOString()
+              });
+            }
+            
+            return snapshots;
+          };
+          
+          const DEMO_SNAPSHOTS = generateSnapshots();
+          
+          const DEMO_SETTINGS = {
+            currency: 'GBP',
+            theme: 'dark',
+            locale: 'en-GB'
+          };
+          
+          export { DEMO_ASSETS, DEMO_SNAPSHOTS, DEMO_SETTINGS };
+          DEMO_EOF
+
+      - name: Create API interceptor for read-only mode
+        working-directory: ./frontend
+        run: |
+          echo "📝 Creating read-only API interceptor..."
+          
+          cat > src/lib/readOnlyInterceptor.js << 'INTERCEPTOR_EOF'
+          import { DEMO_ASSETS, DEMO_SNAPSHOTS, DEMO_SETTINGS } from './demoData.js';
+          
+          // Block any modification attempts
+          const READ_ONLY_MESSAGE = 'This is a read-only demo. Data cannot be modified.';
+          
           const shouldIntercept = (url) => {
             if (typeof url !== 'string') return false;
-            // Intercept localhost:4000 calls and /api/ calls
             return url.includes('localhost:4000') || 
                    url.includes('/api/') ||
                    url.includes('/assets') ||
@@ -325,23 +177,17 @@ jobs:
                    url.includes('/net-worth');
           };
           
-          // Helper to create proper fetch Response
-          const createResponse = (data, status = 200) => {
-            const responseData = data;
-            return Promise.resolve({
-              ok: status >= 200 && status < 300,
-              status: status,
-              statusText: status === 200 ? 'OK' : 'Error',
-              headers: new Headers({ 'content-type': 'application/json' }),
-              json: () => Promise.resolve(responseData),
-              text: () => Promise.resolve(JSON.stringify(responseData)),
-              blob: () => Promise.resolve(new Blob([JSON.stringify(responseData)])),
-              arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-              clone: function() { return createResponse(data, status); }
-            });
-          };
+          const createResponse = (data, status = 200) => ({
+            ok: status >= 200 && status < 300,
+            status: status,
+            statusText: status === 200 ? 'OK' : 'Read Only',
+            headers: new Headers({ 'content-type': 'application/json' }),
+            json: () => Promise.resolve(data),
+            text: () => Promise.resolve(JSON.stringify(data)),
+            clone: function() { return createResponse(data, status); }
+          });
           
-          // Intercept XMLHttpRequest for axios
+          // Intercept XHR
           const originalXHROpen = XMLHttpRequest.prototype.open;
           const originalXHRSend = XMLHttpRequest.prototype.send;
           
@@ -356,128 +202,39 @@ jobs:
             const method = this._method;
             
             if (shouldIntercept(url)) {
-              console.log('🔄 Intercepted XHR:', method, url);
-              console.log('📦 Request body:', body);
-              
               const handleRequest = () => {
                 let response;
-                const parsedBody = body ? JSON.parse(body) : {};
                 
-                try {
-                  // Assets endpoint (handles both /assets and /api/assets)
+                // Block all write operations
+                if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+                  response = { error: READ_ONLY_MESSAGE, success: false };
+                  console.warn('🔒', READ_ONLY_MESSAGE);
+                } else {
+                  // Handle GET requests
                   if (url.includes('/assets') || url.includes('/bankaccounts')) {
-                    if (method === 'POST') {
-                      response = mockAPI.assets.create(parsedBody);
-                      console.log('✅ Asset created via XHR:', response);
-                    } else if (method === 'PUT' || method === 'PATCH') {
-                      const id = url.split('/').pop();
-                      response = mockAPI.assets.update(id, parsedBody);
-                      console.log('✅ Asset updated via XHR:', response);
-                    } else if (method === 'DELETE') {
-                      const id = url.split('/').pop();
-                      response = mockAPI.assets.delete(id);
-                      console.log('✅ Asset deleted via XHR:', id);
-                    } else {
-                      // GET - check if getting single asset or all
-                      const urlParts = url.split('/');
-                      const lastPart = urlParts[urlParts.length - 1];
-                      if (lastPart && lastPart !== 'assets' && lastPart !== 'bankaccounts' && !lastPart.includes('?')) {
-                        response = mockAPI.assets.getById(lastPart);
-                        console.log('✅ Asset retrieved via XHR:', response);
-                      } else {
-                        response = mockAPI.assets.getAll();
-                        console.log('✅ Assets retrieved via XHR:', response.length, 'assets');
-                      }
-                    }
-                  } else if (url.includes('/settings')) {
-                    if (method === 'PUT' || method === 'PATCH' || method === 'POST') {
-                      response = mockAPI.settings.update(parsedBody);
-                      console.log('✅ Settings updated via XHR:', response);
-                    } else {
-                      response = mockAPI.settings.get();
-                      console.log('✅ Settings retrieved via XHR:', response);
-                    }
-                  } else if (url.includes('/history')) {
-                    response = mockAPI.history.getAll();
-                    console.log('✅ History retrieved via XHR:', response.length, 'entries');
-                  } else if (url.includes('/liabilities')) {
-                    // Handle liabilities endpoint (return empty array for now)
-                    response = [];
-                    console.log('✅ Liabilities retrieved via XHR: 0 liabilities');
+                    response = DEMO_ASSETS;
                   } else if (url.includes('/net-worth')) {
-                    // Handle net-worth snapshots endpoint - SYNCHRONOUSLY
-                    response = mockAPI.netWorth.getSnapshots();
-                    console.log('✅ Net worth snapshots retrieved via XHR:', response.length, 'snapshots');
+                    response = DEMO_SNAPSHOTS;
+                  } else if (url.includes('/settings')) {
+                    response = DEMO_SETTINGS;
+                  } else if (url.includes('/liabilities')) {
+                    response = [];
                   } else {
-                    response = { message: 'Endpoint not implemented' };
-                    console.warn('⚠️ Unhandled endpoint:', url);
+                    response = [];
                   }
-                  
-                  // Wait for promise to resolve if needed
-                  if (response && typeof response.then === 'function') {
-                    response.then(data => {
-                      this._completeResponse(data);
-                    }).catch(err => {
-                      console.error('❌ XHR promise error:', err);
-                      this._errorResponse();
-                    });
-                  } else {
-                    this._completeResponse(response);
-                  }
-                  
-                } catch (error) {
-                  console.error('❌ XHR error:', error);
-                  this._errorResponse();
                 }
-              };
-              
-              // Helper to complete the response
-              this._completeResponse = function(response) {
+                
                 const responseText = JSON.stringify(response);
+                Object.defineProperty(this, 'status', { value: 200, configurable: true });
+                Object.defineProperty(this, 'statusText', { value: 'OK', configurable: true });
+                Object.defineProperty(this, 'readyState', { value: 4, configurable: true });
+                Object.defineProperty(this, 'responseText', { value: responseText, configurable: true });
+                Object.defineProperty(this, 'response', { value: response, configurable: true });
                 
-                Object.defineProperty(this, 'status', { value: 200, writable: false, configurable: true });
-                Object.defineProperty(this, 'statusText', { value: 'OK', writable: false, configurable: true });
-                Object.defineProperty(this, 'readyState', { value: 4, writable: false, configurable: true });
-                Object.defineProperty(this, 'responseText', { value: responseText, writable: false, configurable: true });
-                Object.defineProperty(this, 'response', { value: response, writable: false, configurable: true });
-                
-                console.log('XHR Response prepared for:', this._url);
-                
-                if (this.onreadystatechange) {
-                  this.onreadystatechange.call(this);
-                }
-                
-                const loadEvent = new ProgressEvent('load', {
-                  lengthComputable: true,
-                  loaded: responseText.length,
-                  total: responseText.length
-                });
-                
-                if (this.onload) {
-                  this.onload.call(this, loadEvent);
-                }
-                
-                this.dispatchEvent(loadEvent);
-                
-                const loadEndEvent = new ProgressEvent('loadend', {
-                  lengthComputable: true,
-                  loaded: responseText.length,
-                  total: responseText.length
-                });
-                this.dispatchEvent(loadEndEvent);
+                if (this.onreadystatechange) this.onreadystatechange.call(this);
+                if (this.onload) this.onload.call(this, new Event('load'));
               };
               
-              this._errorResponse = function() {
-                Object.defineProperty(this, 'status', { value: 500, writable: false, configurable: true });
-                Object.defineProperty(this, 'statusText', { value: 'Error', writable: false, configurable: true });
-                Object.defineProperty(this, 'readyState', { value: 4, writable: false, configurable: true });
-                
-                const errorEvent = new ProgressEvent('error');
-                this.dispatchEvent(errorEvent);
-                if (this.onerror) this.onerror.call(this, errorEvent);
-              };
-              
-              // Execute synchronously (no setTimeout)
               handleRequest.call(this);
               return;
             }
@@ -485,1049 +242,98 @@ jobs:
             return originalXHRSend.call(this, body);
           };
           
-          // Also intercept fetch for completeness
-          window.fetch = function(...args) {
-            const url = args[0];
-            const options = args[1] || {};
-            
-            if (shouldIntercept(url)) {
-              console.log('🔄 Intercepted fetch:', options.method || 'GET', url);
-              console.log('📦 Request body:', options.body);
-              
-              try {
-                if (url.includes('/assets') || url.includes('/bankaccounts')) {
-                  if (options.method === 'POST') {
-                    const body = options.body ? JSON.parse(options.body) : {};
-                    return mockAPI.assets.create(body).then(data => {
-                      console.log('✅ Asset created via fetch:', data);
-                      return createResponse(data);
-                    });
-                  } else if (options.method === 'PUT' || options.method === 'PATCH') {
-                    const id = url.split('/').pop();
-                    const body = options.body ? JSON.parse(options.body) : {};
-                    return mockAPI.assets.update(id, body).then(data => {
-                      console.log('✅ Asset updated via fetch:', data);
-                      return createResponse(data);
-                    });
-                  } else if (options.method === 'DELETE') {
-                    const id = url.split('/').pop();
-                    return mockAPI.assets.delete(id).then(data => {
-                      console.log('✅ Asset deleted via fetch:', id);
-                      return createResponse(data);
-                    });
-                  } else {
-                    const urlParts = url.split('/');
-                    const lastPart = urlParts[urlParts.length - 1];
-                    if (lastPart && lastPart !== 'assets' && lastPart !== 'bankaccounts' && !lastPart.includes('?')) {
-                      return mockAPI.assets.getById(lastPart).then(data => {
-                        console.log('✅ Asset retrieved via fetch:', data);
-                        return createResponse(data);
-                      });
-                    }
-                    return mockAPI.assets.getAll().then(data => {
-                      console.log('✅ Assets retrieved via fetch:', data.length, 'assets');
-                      return createResponse(data);
-                    });
-                  }
-                } else if (url.includes('/settings')) {
-                  if (options.method === 'PUT' || options.method === 'PATCH' || options.method === 'POST') {
-                    const body = options.body ? JSON.parse(options.body) : {};
-                    return mockAPI.settings.update(body).then(data => {
-                      console.log('✅ Settings updated via fetch:', data);
-                      return createResponse(data);
-                    });
-                  } else {
-                    return mockAPI.settings.get().then(data => {
-                      console.log('✅ Settings retrieved via fetch:', data);
-                      return createResponse(data);
-                    });
-                  }
-                } else if (url.includes('/history')) {
-                  return mockAPI.history.getAll().then(data => {
-                    console.log('✅ History retrieved via fetch:', data.length, 'entries');
-                    return createResponse(data);
-                  });
-                } else if (url.includes('/liabilities')) {
-                  // Handle liabilities endpoint (return empty array for now)
-                  console.log('✅ Liabilities retrieved via fetch: 0 liabilities');
-                  return createResponse([]);
-                } else if (url.includes('/net-worth')) {
-                  // Handle net-worth snapshots endpoint
-                  return mockAPI.netWorth.getSnapshots().then(data => {
-                    console.log('✅ Net worth snapshots retrieved via fetch:', data.length, 'snapshots');
-                    return createResponse(data);
-                  });
-                }
-                
-                console.warn('⚠️ Unhandled endpoint via fetch:', url);
-                return createResponse({ message: 'Endpoint not implemented' }, 404);
-              } catch (error) {
-                console.error('❌ Fetch interceptor error:', error);
-                return createResponse({ error: error.message }, 500);
-              }
-            }
-            
-            // Pass through non-API calls
-            return originalFetch.apply(this, args);
-          };
-          
-          console.log('✅ Browser storage API interceptor loaded (fetch + XHR)');
-          console.log('📡 Intercepting: localhost:4000, /api/, /assets, /bankaccounts, /liabilities, /net-worth, /settings, /history');
-          INTERCEPTOR_EOF
-
-      - name: Inject interceptor into entry point
-        working-directory: ./frontend
-        run: |
-          echo "🔍 Looking for entry file..."
-          
-          # Determine source directory
-          if [ -d "src" ]; then
-            SRC_DIR="src"
-          elif [ -d "app" ]; then
-            SRC_DIR="app"
-          else
-            SRC_DIR="."
-          fi
-          
-          echo "📁 Using source directory: $SRC_DIR"
-          ls -la "$SRC_DIR/"
-          
-          # Find the main entry file
-          ENTRY_FILE=$(find "$SRC_DIR" -maxdepth 1 \( -name "main.*" -o -name "index.*" -o -name "App.*" \) | head -1)
-          
-          if [ -z "$ENTRY_FILE" ]; then
-            echo "⚠️  Could not find entry file, checking subdirectories..."
-            ENTRY_FILE=$(find "$SRC_DIR" -maxdepth 2 \( -name "main.*" -o -name "index.*" \) | head -1)
-          fi
-          
-          if [ -z "$ENTRY_FILE" ]; then
-            echo "❌ Could not find entry file. Available files:"
-            find "$SRC_DIR" -type f -name "*.jsx" -o -name "*.tsx" -o -name "*.js" -o -name "*.ts"
-            echo "⚠️  Skipping interceptor injection - will rely on manual API replacement"
-          else
-            echo "📝 Injecting interceptor into: $ENTRY_FILE"
-            
-            # Create a backup
-            cp "$ENTRY_FILE" "${ENTRY_FILE}.backup"
-            
-            # Determine relative path to lib
-            ENTRY_DIR=$(dirname "$ENTRY_FILE")
-            if [ "$ENTRY_DIR" = "$SRC_DIR" ]; then
-              IMPORT_PATH="./lib/apiInterceptor.js"
-            else
-              IMPORT_PATH="../lib/apiInterceptor.js"
-            fi
-            
-            # Add import at the top of the file
-            echo "import '$IMPORT_PATH';" | cat - "$ENTRY_FILE" > temp && mv temp "$ENTRY_FILE"
-            
-            echo "✅ Interceptor injected"
-            echo "📄 Modified file content (first 10 lines):"
-            head -10 "$ENTRY_FILE"
-          fi
-
-      - name: Update Vite config for GitHub Pages
-        working-directory: ./frontend
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          echo "📝 Updating Vite config for GitHub Pages..."
-          
-          # Find the config file
-          if [ -f "vite.config.js" ]; then
-            CONFIG_FILE="vite.config.js"
-          elif [ -f "vite.config.ts" ]; then
-            CONFIG_FILE="vite.config.ts"
-          else
-            echo "⚠️ No vite.config found, creating one"
-            cat > vite.config.js << 'VITE_EOF'
-          import { defineConfig } from 'vite'
-          import react from '@vitejs/plugin-react'
-          import path from 'path'
-
-          export default defineConfig({
-            plugins: [react()],
-            base: '/wealth-tracker/',
-            build: {
-              outDir: 'build',
-            },
-            resolve: {
-              alias: {
-                '@': path.resolve(__dirname, './src'),
-              },
-            },
-          })
-          VITE_EOF
-            echo "✅ Created new vite.config.js"
-            exit 0
-          fi
-          
-          echo "📄 Original config:"
-          cat "$CONFIG_FILE"
-          
-          # Backup original
-          cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-          
-          # Extract repo name from GITHUB_REPOSITORY
-          REPO_NAME="${GITHUB_REPOSITORY#*/}"
-          echo "🔧 Setting base path to: /$REPO_NAME/"
-          
-          # Check if base is already set and update it, or add it
-          if grep -q "base:" "$CONFIG_FILE"; then
-            # Replace existing base
-            sed -i "s|base:.*|base: '/$REPO_NAME/',|g" "$CONFIG_FILE"
-          else
-            # Add base after defineConfig({
-            sed -i "/defineConfig({/a\  base: '/$REPO_NAME/'," "$CONFIG_FILE"
-          fi
-          
-          echo "✅ Updated vite.config"
-          echo "📄 New config:"
-          cat "$CONFIG_FILE"
-          
-          # Now also patch React Router to use basename
-          echo "📝 Looking for React Router configuration..."
-          
-          # Find files that might contain BrowserRouter or Router setup
-          ROUTER_FILES=$(find src -type f \( -name "*.jsx" -o -name "*.tsx" -o -name "*.js" -o -name "*.ts" \) -exec grep -l "BrowserRouter\|createBrowserRouter\|Router" {} \; 2>/dev/null || echo "")
-          
-          if [ -n "$ROUTER_FILES" ]; then
-            echo "Found potential router files:"
-            echo "$ROUTER_FILES"
-            
-            for file in $ROUTER_FILES; do
-              echo "📝 Patching router in: $file"
-              
-              # Backup the file
-              cp "$file" "${file}.backup"
-              
-              # Add basename to BrowserRouter if it doesn't have one
-              if grep -q "<BrowserRouter>" "$file" 2>/dev/null; then
-                sed -i "s|<BrowserRouter>|<BrowserRouter basename=\"/$REPO_NAME\">|g" "$file"
-                echo "✅ Added basename to BrowserRouter in $file"
-              fi
-              
-              # For createBrowserRouter, it's more complex - just log it
-              if grep -q "createBrowserRouter" "$file" 2>/dev/null; then
-                echo "⚠️ Found createBrowserRouter in $file - may need manual basename configuration"
-              fi
-            done
-          else
-            echo "⚠️ No router files found - app might use hash routing or different setup"
-          fi
-
-      - name: Build
-        working-directory: ./frontend
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          echo "📦 Building frontend..."
-          npm run build
-          
-          echo "📁 Checking build output..."
-          ls -la
-          
-          # Check for both dist and build directories
-          if [ -d "dist" ]; then
-            BUILD_DIR="dist"
-            echo "✅ Build directory 'dist' exists"
-          elif [ -d "build" ]; then
-            BUILD_DIR="build"
-            echo "✅ Build directory 'build' exists"
-          else
-            echo "❌ No build directory found!"
-            exit 1
-          fi
-          
-          ls -la "$BUILD_DIR/"
-          
-          # Add 404.html for client-side routing (SPA fallback)
-          echo "📝 Creating 404.html for SPA routing..."
-          cp "$BUILD_DIR/index.html" "$BUILD_DIR/404.html"
-          
-          # Add a notice to the built index.html
-          if [ -f "$BUILD_DIR/index.html" ]; then
-            sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' "$BUILD_DIR/index.html"
-            echo "✅ Added demo banner"
-          fi
-          
-          # Also add banner to 404.html
-          if [ -f "$BUILD_DIR/404.html" ]; then
-            sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' "$BUILD_DIR/404.html"
-          fi
-          
-          # Store the build directory name for the next step
-          echo "BUILD_DIR=$BUILD_DIR" >> $GITHUB_ENV
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: './frontend/${{ env.BUILD_DIR }}'
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4name: Deploy Demo to GitHub Pages
-
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Create browser storage adapter
-        working-directory: ./frontend
-        run: |
-          echo "📁 Current directory structure:"
-          ls -la
-          
-          # Check if src exists, if not try to find where the source files are
-          if [ -d "src" ]; then
-            echo "✅ src/ directory found"
-            SRC_DIR="src"
-          elif [ -d "app" ]; then
-            echo "✅ app/ directory found (Next.js style)"
-            SRC_DIR="app"
-          else
-            echo "⚠️  Creating src/ directory"
-            mkdir -p src
-            SRC_DIR="src"
-          fi
-          
-          # Create lib directory if it doesn't exist
-          mkdir -p "$SRC_DIR/lib"
-          
-          # Create the browser storage module
-          cat > "$SRC_DIR/lib/browserStorage.js" << 'STORAGE_EOF'
-          // Auto-generated browser storage adapter for GitHub Pages demo
-          
-          const STORAGE_PREFIX = 'wealth_tracker_';
-          
-          const storage = {
-            get: (key) => {
-              try {
-                const item = localStorage.getItem(STORAGE_PREFIX + key);
-                return item ? JSON.parse(item) : null;
-              } catch (e) {
-                console.error('Storage get error:', e);
-                return null;
-              }
-            },
-            
-            set: (key, value) => {
-              try {
-                localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(value));
-                console.log('💾 Saved to storage:', key, value);
-                return true;
-              } catch (e) {
-                console.error('Storage set error:', e);
-                return false;
-              }
-            },
-            
-            remove: (key) => {
-              try {
-                localStorage.removeItem(STORAGE_PREFIX + key);
-                return true;
-              } catch (e) {
-                console.error('Storage remove error:', e);
-                return false;
-              }
-            },
-            
-            getAll: (prefix) => {
-              const result = {};
-              for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith(STORAGE_PREFIX + prefix)) {
-                  const shortKey = key.replace(STORAGE_PREFIX, '');
-                  result[shortKey] = storage.get(shortKey.replace(prefix, ''));
-                }
-              }
-              return result;
-            }
-          };
-          
-          // Initialize with sample data if empty
-          const initSampleData = () => {
-            if (!storage.get('initialized')) {
-              console.log('🎬 Initializing sample data...');
-              storage.set('initialized', true);
-              storage.set('assets', [
-                {
-                  id: '1',
-                  name: 'Savings Account',
-                  type: 'Bank Account',
-                  value: 25000,
-                  currency: 'USD',
-                  icon: 'piggy-bank',
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                },
-                {
-                  id: '2',
-                  name: 'Investment Portfolio',
-                  type: 'Investments',
-                  value: 50000,
-                  currency: 'USD',
-                  icon: 'trending-up',
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                }
-              ]);
-              storage.set('settings', {
-                currency: 'USD',
-                theme: 'dark',
-                locale: 'en-US'
-              });
-              
-              // Pre-generate net worth snapshots to avoid chart rendering issues
-              const now = new Date();
-              const snapshots = [];
-              for (let i = 11; i >= 0; i--) {
-                const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const value = 75000 * (0.85 + Math.random() * 0.3);
-                snapshots.push({
-                  id: 12 - i,
-                  date: date.toISOString(),
-                  totalAssets: Math.round(value * 100) / 100,
-                  totalLiabilities: 0,
-                  netWorth: Math.round(value * 100) / 100,
-                  createdAt: date.toISOString(),
-                  updatedAt: date.toISOString()
-                });
-              }
-              storage.set('netWorthSnapshots', snapshots);
-              
-              console.log('✅ Sample data initialized with snapshots');
-            }
-          };
-          
-          export const mockAPI = {
-            assets: {
-              getAll: () => {
-                const assets = storage.get('assets') || [];
-                console.log('📋 Getting all assets:', assets.length);
-                return Promise.resolve(assets);
-              },
-              getById: (id) => {
-                const assets = storage.get('assets') || [];
-                const asset = assets.find(a => a.id === id) || null;
-                console.log('🔍 Getting asset by id:', id, asset);
-                return Promise.resolve(asset);
-              },
-              create: (asset) => {
-                console.log('➕ Creating asset:', asset);
-                const assets = storage.get('assets') || [];
-                const newAsset = {
-                  ...asset,
-                  id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                };
-                assets.push(newAsset);
-                storage.set('assets', assets);
-                console.log('✅ Asset created:', newAsset);
-                return Promise.resolve(newAsset);
-              },
-              update: (id, updates) => {
-                console.log('📝 Updating asset:', id, updates);
-                const assets = storage.get('assets') || [];
-                const index = assets.findIndex(a => a.id === id);
-                if (index >= 0) {
-                  assets[index] = { ...assets[index], ...updates, updatedAt: new Date().toISOString() };
-                  storage.set('assets', assets);
-                  console.log('✅ Asset updated:', assets[index]);
-                  return Promise.resolve(assets[index]);
-                }
-                console.warn('⚠️ Asset not found:', id);
-                return Promise.resolve(null);
-              },
-              delete: (id) => {
-                console.log('🗑️ Deleting asset:', id);
-                let assets = storage.get('assets') || [];
-                const initialLength = assets.length;
-                assets = assets.filter(a => a.id !== id);
-                storage.set('assets', assets);
-                console.log('✅ Asset deleted, remaining:', assets.length);
-                return Promise.resolve({ success: true, deleted: initialLength !== assets.length });
-              }
-            },
-            
-            settings: {
-              get: () => {
-                const settings = storage.get('settings') || { currency: 'USD', theme: 'dark' };
-                console.log('⚙️ Getting settings:', settings);
-                return Promise.resolve(settings);
-              },
-              update: (updates) => {
-                console.log('⚙️ Updating settings:', updates);
-                const current = storage.get('settings') || {};
-                const updated = { ...current, ...updates };
-                storage.set('settings', updated);
-                console.log('✅ Settings updated:', updated);
-                return Promise.resolve(updated);
-              }
-            },
-            
-            history: {
-              getAll: () => {
-                const assets = storage.get('assets') || [];
-                const totalValue = assets.reduce((sum, a) => sum + (parseFloat(a.value) || 0), 0);
-                // Generate mock history data
-                const history = [];
-                for (let i = 30; i >= 0; i--) {
-                  const date = new Date();
-                  date.setDate(date.getDate() - i);
-                  history.push({
-                    date: date.toISOString(),
-                    totalValue: totalValue * (0.9 + Math.random() * 0.2),
-                    assetBreakdown: {}
-                  });
-                }
-                console.log('📊 Getting history:', history.length, 'entries');
-                return Promise.resolve(history);
-              }
-            },
-            
-            netWorth: {
-              getSnapshots: () => {
-                const assets = storage.get('assets') || [];
-                const totalValue = assets.reduce((sum, a) => sum + (parseFloat(a.value) || 0), 0);
-                
-                // Generate snapshots for the last 12 months
-                const snapshots = [];
-                const now = new Date();
-                
-                for (let i = 11; i >= 0; i--) {
-                  const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                  const variation = 0.85 + (Math.random() * 0.3); // Random variation between 0.85 and 1.15
-                  const value = Math.round(totalValue * variation * 100) / 100;
-                  
-                  snapshots.push({
-                    id: i + 1,
-                    // Provide the date in ISO format which is most commonly used
-                    date: date.toISOString(),
-                    totalAssets: value,
-                    totalLiabilities: 0,
-                    netWorth: value,
-                    createdAt: date.toISOString(),
-                    updatedAt: date.toISOString()
-                  });
-                }
-                
-                console.log('📊 Getting net worth snapshots:', snapshots.length, 'entries');
-                console.log('📊 First snapshot:', JSON.stringify(snapshots[0], null, 2));
-                console.log('📊 Last snapshot:', JSON.stringify(snapshots[snapshots.length - 1], null, 2));
-                return Promise.resolve(snapshots);
-              }
-            }
-          };
-          
-          // Initialize on load
-          if (typeof window !== 'undefined') {
-            initSampleData();
-          }
-          
-          export default mockAPI;
-          STORAGE_EOF
-
-      - name: Create API interceptor
-        working-directory: ./frontend
-        run: |
-          # Use the same SRC_DIR we found earlier
-          if [ -d "src" ]; then
-            SRC_DIR="src"
-          elif [ -d "app" ]; then
-            SRC_DIR="app"
-          else
-            SRC_DIR="src"
-          fi
-          
-          # Create an interceptor that replaces fetch calls
-          cat > "$SRC_DIR/lib/apiInterceptor.js" << 'INTERCEPTOR_EOF'
-          import mockAPI from './browserStorage.js';
-          
+          // Intercept fetch
           const originalFetch = window.fetch;
-          
-          // Helper to check if URL should be intercepted
-          const shouldIntercept = (url) => {
-            if (typeof url !== 'string') return false;
-            // Intercept localhost:4000 calls and /api/ calls
-            return url.includes('localhost:4000') || 
-                   url.includes('/api/') ||
-                   url.includes('/assets') ||
-                   url.includes('/bankaccounts') ||
-                   url.includes('/liabilities') ||
-                   url.includes('/settings') ||
-                   url.includes('/history') ||
-                   url.includes('/net-worth');
-          };
-          
-          // Helper to create proper fetch Response
-          const createResponse = (data, status = 200) => {
-            const responseData = data;
-            return Promise.resolve({
-              ok: status >= 200 && status < 300,
-              status: status,
-              statusText: status === 200 ? 'OK' : 'Error',
-              headers: new Headers({ 'content-type': 'application/json' }),
-              json: () => Promise.resolve(responseData),
-              text: () => Promise.resolve(JSON.stringify(responseData)),
-              blob: () => Promise.resolve(new Blob([JSON.stringify(responseData)])),
-              arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
-              clone: function() { return createResponse(data, status); }
-            });
-          };
-          
-          // Intercept XMLHttpRequest for axios
-          const originalXHROpen = XMLHttpRequest.prototype.open;
-          const originalXHRSend = XMLHttpRequest.prototype.send;
-          
-          XMLHttpRequest.prototype.open = function(method, url, ...args) {
-            this._method = method;
-            this._url = url;
-            return originalXHROpen.call(this, method, url, ...args);
-          };
-          
-          XMLHttpRequest.prototype.send = function(body) {
-            const url = this._url;
-            const method = this._method;
-            
-            if (shouldIntercept(url)) {
-              console.log('🔄 Intercepted XHR:', method, url);
-              console.log('📦 Request body:', body);
-              
-              const handleRequest = () => {
-                let response;
-                const parsedBody = body ? JSON.parse(body) : {};
-                
-                try {
-                  // Assets endpoint (handles both /assets and /api/assets)
-                  if (url.includes('/assets') || url.includes('/bankaccounts')) {
-                    if (method === 'POST') {
-                      response = mockAPI.assets.create(parsedBody);
-                      console.log('✅ Asset created via XHR:', response);
-                    } else if (method === 'PUT' || method === 'PATCH') {
-                      const id = url.split('/').pop();
-                      response = mockAPI.assets.update(id, parsedBody);
-                      console.log('✅ Asset updated via XHR:', response);
-                    } else if (method === 'DELETE') {
-                      const id = url.split('/').pop();
-                      response = mockAPI.assets.delete(id);
-                      console.log('✅ Asset deleted via XHR:', id);
-                    } else {
-                      // GET - check if getting single asset or all
-                      const urlParts = url.split('/');
-                      const lastPart = urlParts[urlParts.length - 1];
-                      if (lastPart && lastPart !== 'assets' && lastPart !== 'bankaccounts' && !lastPart.includes('?')) {
-                        response = mockAPI.assets.getById(lastPart);
-                        console.log('✅ Asset retrieved via XHR:', response);
-                      } else {
-                        response = mockAPI.assets.getAll();
-                        console.log('✅ Assets retrieved via XHR:', response.length, 'assets');
-                      }
-                    }
-                  } else if (url.includes('/settings')) {
-                    if (method === 'PUT' || method === 'PATCH' || method === 'POST') {
-                      response = mockAPI.settings.update(parsedBody);
-                      console.log('✅ Settings updated via XHR:', response);
-                    } else {
-                      response = mockAPI.settings.get();
-                      console.log('✅ Settings retrieved via XHR:', response);
-                    }
-                  } else if (url.includes('/history')) {
-                    response = mockAPI.history.getAll();
-                    console.log('✅ History retrieved via XHR:', response.length, 'entries');
-                  } else if (url.includes('/liabilities')) {
-                    // Handle liabilities endpoint (return empty array for now)
-                    response = [];
-                    console.log('✅ Liabilities retrieved via XHR: 0 liabilities');
-                  } else if (url.includes('/net-worth')) {
-                    // Handle net-worth snapshots endpoint - SYNCHRONOUSLY
-                    response = mockAPI.netWorth.getSnapshots();
-                    console.log('✅ Net worth snapshots retrieved via XHR:', response.length, 'snapshots');
-                  } else {
-                    response = { message: 'Endpoint not implemented' };
-                    console.warn('⚠️ Unhandled endpoint:', url);
-                  }
-                  
-                  // Wait for promise to resolve if needed
-                  if (response && typeof response.then === 'function') {
-                    response.then(data => {
-                      this._completeResponse(data);
-                    }).catch(err => {
-                      console.error('❌ XHR promise error:', err);
-                      this._errorResponse();
-                    });
-                  } else {
-                    this._completeResponse(response);
-                  }
-                  
-                } catch (error) {
-                  console.error('❌ XHR error:', error);
-                  this._errorResponse();
-                }
-              };
-              
-              // Helper to complete the response
-              this._completeResponse = function(response) {
-                const responseText = JSON.stringify(response);
-                
-                Object.defineProperty(this, 'status', { value: 200, writable: false, configurable: true });
-                Object.defineProperty(this, 'statusText', { value: 'OK', writable: false, configurable: true });
-                Object.defineProperty(this, 'readyState', { value: 4, writable: false, configurable: true });
-                Object.defineProperty(this, 'responseText', { value: responseText, writable: false, configurable: true });
-                Object.defineProperty(this, 'response', { value: response, writable: false, configurable: true });
-                
-                console.log('XHR Response prepared for:', this._url);
-                
-                if (this.onreadystatechange) {
-                  this.onreadystatechange.call(this);
-                }
-                
-                const loadEvent = new ProgressEvent('load', {
-                  lengthComputable: true,
-                  loaded: responseText.length,
-                  total: responseText.length
-                });
-                
-                if (this.onload) {
-                  this.onload.call(this, loadEvent);
-                }
-                
-                this.dispatchEvent(loadEvent);
-                
-                const loadEndEvent = new ProgressEvent('loadend', {
-                  lengthComputable: true,
-                  loaded: responseText.length,
-                  total: responseText.length
-                });
-                this.dispatchEvent(loadEndEvent);
-              };
-              
-              this._errorResponse = function() {
-                Object.defineProperty(this, 'status', { value: 500, writable: false, configurable: true });
-                Object.defineProperty(this, 'statusText', { value: 'Error', writable: false, configurable: true });
-                Object.defineProperty(this, 'readyState', { value: 4, writable: false, configurable: true });
-                
-                const errorEvent = new ProgressEvent('error');
-                this.dispatchEvent(errorEvent);
-                if (this.onerror) this.onerror.call(this, errorEvent);
-              };
-              
-              // Execute synchronously (no setTimeout)
-              handleRequest.call(this);
-              return;
-            }
-            
-            return originalXHRSend.call(this, body);
-          };
-          
-          // Also intercept fetch for completeness
           window.fetch = function(...args) {
             const url = args[0];
             const options = args[1] || {};
             
             if (shouldIntercept(url)) {
-              console.log('🔄 Intercepted fetch:', options.method || 'GET', url);
-              console.log('📦 Request body:', options.body);
+              const method = options.method || 'GET';
               
-              try {
-                if (url.includes('/assets') || url.includes('/bankaccounts')) {
-                  if (options.method === 'POST') {
-                    const body = options.body ? JSON.parse(options.body) : {};
-                    return mockAPI.assets.create(body).then(data => {
-                      console.log('✅ Asset created via fetch:', data);
-                      return createResponse(data);
-                    });
-                  } else if (options.method === 'PUT' || options.method === 'PATCH') {
-                    const id = url.split('/').pop();
-                    const body = options.body ? JSON.parse(options.body) : {};
-                    return mockAPI.assets.update(id, body).then(data => {
-                      console.log('✅ Asset updated via fetch:', data);
-                      return createResponse(data);
-                    });
-                  } else if (options.method === 'DELETE') {
-                    const id = url.split('/').pop();
-                    return mockAPI.assets.delete(id).then(data => {
-                      console.log('✅ Asset deleted via fetch:', id);
-                      return createResponse(data);
-                    });
-                  } else {
-                    const urlParts = url.split('/');
-                    const lastPart = urlParts[urlParts.length - 1];
-                    if (lastPart && lastPart !== 'assets' && lastPart !== 'bankaccounts' && !lastPart.includes('?')) {
-                      return mockAPI.assets.getById(lastPart).then(data => {
-                        console.log('✅ Asset retrieved via fetch:', data);
-                        return createResponse(data);
-                      });
-                    }
-                    return mockAPI.assets.getAll().then(data => {
-                      console.log('✅ Assets retrieved via fetch:', data.length, 'assets');
-                      return createResponse(data);
-                    });
-                  }
-                } else if (url.includes('/settings')) {
-                  if (options.method === 'PUT' || options.method === 'PATCH' || options.method === 'POST') {
-                    const body = options.body ? JSON.parse(options.body) : {};
-                    return mockAPI.settings.update(body).then(data => {
-                      console.log('✅ Settings updated via fetch:', data);
-                      return createResponse(data);
-                    });
-                  } else {
-                    return mockAPI.settings.get().then(data => {
-                      console.log('✅ Settings retrieved via fetch:', data);
-                      return createResponse(data);
-                    });
-                  }
-                } else if (url.includes('/history')) {
-                  return mockAPI.history.getAll().then(data => {
-                    console.log('✅ History retrieved via fetch:', data.length, 'entries');
-                    return createResponse(data);
-                  });
-                } else if (url.includes('/liabilities')) {
-                  // Handle liabilities endpoint (return empty array for now)
-                  console.log('✅ Liabilities retrieved via fetch: 0 liabilities');
-                  return createResponse([]);
-                } else if (url.includes('/net-worth')) {
-                  // Handle net-worth snapshots endpoint
-                  return mockAPI.netWorth.getSnapshots().then(data => {
-                    console.log('✅ Net worth snapshots retrieved via fetch:', data.length, 'snapshots');
-                    return createResponse(data);
-                  });
-                }
-                
-                console.warn('⚠️ Unhandled endpoint via fetch:', url);
-                return createResponse({ message: 'Endpoint not implemented' }, 404);
-              } catch (error) {
-                console.error('❌ Fetch interceptor error:', error);
-                return createResponse({ error: error.message }, 500);
+              // Block write operations
+              if (method !== 'GET') {
+                console.warn('🔒', READ_ONLY_MESSAGE);
+                return Promise.resolve(createResponse({ error: READ_ONLY_MESSAGE, success: false }, 403));
               }
+              
+              // Handle GET requests
+              if (url.includes('/assets') || url.includes('/bankaccounts')) {
+                return Promise.resolve(createResponse(DEMO_ASSETS));
+              } else if (url.includes('/net-worth')) {
+                return Promise.resolve(createResponse(DEMO_SNAPSHOTS));
+              } else if (url.includes('/settings')) {
+                return Promise.resolve(createResponse(DEMO_SETTINGS));
+              } else if (url.includes('/liabilities')) {
+                return Promise.resolve(createResponse([]));
+              }
+              
+              return Promise.resolve(createResponse([]));
             }
             
-            // Pass through non-API calls
             return originalFetch.apply(this, args);
           };
           
-          console.log('✅ Browser storage API interceptor loaded (fetch + XHR)');
-          console.log('📡 Intercepting: localhost:4000, /api/, /assets, /bankaccounts, /liabilities, /net-worth, /settings, /history');
+          console.log('🔒 Read-only demo mode active - all modifications are disabled');
           INTERCEPTOR_EOF
 
-      - name: Inject interceptor into entry point
+      - name: Inject interceptor
         working-directory: ./frontend
         run: |
-          echo "🔍 Looking for entry file..."
+          echo "🔍 Injecting read-only interceptor..."
           
-          # Determine source directory
-          if [ -d "src" ]; then
-            SRC_DIR="src"
-          elif [ -d "app" ]; then
-            SRC_DIR="app"
-          else
-            SRC_DIR="."
-          fi
+          ENTRY_FILE=$(find src -maxdepth 1 \( -name "main.*" -o -name "index.*" \) | head -1)
           
-          echo "📁 Using source directory: $SRC_DIR"
-          ls -la "$SRC_DIR/"
-          
-          # Find the main entry file
-          ENTRY_FILE=$(find "$SRC_DIR" -maxdepth 1 \( -name "main.*" -o -name "index.*" -o -name "App.*" \) | head -1)
-          
-          if [ -z "$ENTRY_FILE" ]; then
-            echo "⚠️  Could not find entry file, checking subdirectories..."
-            ENTRY_FILE=$(find "$SRC_DIR" -maxdepth 2 \( -name "main.*" -o -name "index.*" \) | head -1)
-          fi
-          
-          if [ -z "$ENTRY_FILE" ]; then
-            echo "❌ Could not find entry file. Available files:"
-            find "$SRC_DIR" -type f -name "*.jsx" -o -name "*.tsx" -o -name "*.js" -o -name "*.ts"
-            echo "⚠️  Skipping interceptor injection - will rely on manual API replacement"
-          else
-            echo "📝 Injecting interceptor into: $ENTRY_FILE"
-            
-            # Create a backup
-            cp "$ENTRY_FILE" "${ENTRY_FILE}.backup"
-            
-            # Determine relative path to lib
-            ENTRY_DIR=$(dirname "$ENTRY_FILE")
-            if [ "$ENTRY_DIR" = "$SRC_DIR" ]; then
-              IMPORT_PATH="./lib/apiInterceptor.js"
-            else
-              IMPORT_PATH="../lib/apiInterceptor.js"
-            fi
-            
-            # Add import at the top of the file
-            echo "import '$IMPORT_PATH';" | cat - "$ENTRY_FILE" > temp && mv temp "$ENTRY_FILE"
-            
-            echo "✅ Interceptor injected"
-            echo "📄 Modified file content (first 10 lines):"
-            head -10 "$ENTRY_FILE"
+          if [ -n "$ENTRY_FILE" ]; then
+            echo "import './lib/readOnlyInterceptor.js';" | cat - "$ENTRY_FILE" > temp && mv temp "$ENTRY_FILE"
+            echo "✅ Interceptor injected into $ENTRY_FILE"
           fi
 
-      - name: Update Vite config for GitHub Pages
+      - name: Update Vite config
         working-directory: ./frontend
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          echo "📝 Updating Vite config for GitHub Pages..."
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
           
-          # Find the config file
           if [ -f "vite.config.js" ]; then
             CONFIG_FILE="vite.config.js"
           elif [ -f "vite.config.ts" ]; then
             CONFIG_FILE="vite.config.ts"
           else
-            echo "⚠️ No vite.config found, creating one"
             cat > vite.config.js << 'VITE_EOF'
           import { defineConfig } from 'vite'
           import react from '@vitejs/plugin-react'
-          import path from 'path'
-
+          
           export default defineConfig({
             plugins: [react()],
             base: '/wealth-tracker/',
-            build: {
-              outDir: 'build',
-            },
-            resolve: {
-              alias: {
-                '@': path.resolve(__dirname, './src'),
-              },
-            },
+            build: { outDir: 'build' }
           })
           VITE_EOF
-            echo "✅ Created new vite.config.js"
             exit 0
           fi
           
-          echo "📄 Original config:"
-          cat "$CONFIG_FILE"
-          
-          # Backup original
-          cp "$CONFIG_FILE" "${CONFIG_FILE}.backup"
-          
-          # Extract repo name from GITHUB_REPOSITORY
-          REPO_NAME="${GITHUB_REPOSITORY#*/}"
-          echo "🔧 Setting base path to: /$REPO_NAME/"
-          
-          # Check if base is already set and update it, or add it
-          if grep -q "base:" "$CONFIG_FILE"; then
-            # Replace existing base
-            sed -i "s|base:.*|base: '/$REPO_NAME/',|g" "$CONFIG_FILE"
-          else
-            # Add base after defineConfig({
-            sed -i "/defineConfig({/a\  base: '/$REPO_NAME/'," "$CONFIG_FILE"
-          fi
-          
-          echo "✅ Updated vite.config"
-          echo "📄 New config:"
-          cat "$CONFIG_FILE"
-          
-          # Now also patch React Router to use basename
-          echo "📝 Looking for React Router configuration..."
-          
-          # Find files that might contain BrowserRouter or Router setup
-          ROUTER_FILES=$(find src -type f \( -name "*.jsx" -o -name "*.tsx" -o -name "*.js" -o -name "*.ts" \) -exec grep -l "BrowserRouter\|createBrowserRouter\|Router" {} \; 2>/dev/null || echo "")
-          
-          if [ -n "$ROUTER_FILES" ]; then
-            echo "Found potential router files:"
-            echo "$ROUTER_FILES"
-            
-            for file in $ROUTER_FILES; do
-              echo "📝 Patching router in: $file"
-              
-              # Backup the file
-              cp "$file" "${file}.backup"
-              
-              # Add basename to BrowserRouter if it doesn't have one
-              if grep -q "<BrowserRouter>" "$file" 2>/dev/null; then
-                sed -i "s|<BrowserRouter>|<BrowserRouter basename=\"/$REPO_NAME\">|g" "$file"
-                echo "✅ Added basename to BrowserRouter in $file"
-              fi
-              
-              # For createBrowserRouter, it's more complex - just log it
-              if grep -q "createBrowserRouter" "$file" 2>/dev/null; then
-                echo "⚠️ Found createBrowserRouter in $file - may need manual basename configuration"
-              fi
-            done
-          else
-            echo "⚠️ No router files found - app might use hash routing or different setup"
-          fi
+          sed -i "s|base:.*|base: '/$REPO_NAME/',|g" "$CONFIG_FILE" || \
+          sed -i "/defineConfig({/a\  base: '/$REPO_NAME/'," "$CONFIG_FILE"
 
       - name: Build
         working-directory: ./frontend
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
-          echo "📦 Building frontend..."
           npm run build
           
-          echo "📁 Checking build output..."
-          ls -la
+          BUILD_DIR="build"
+          [ -d "dist" ] && BUILD_DIR="dist"
           
-          # Check for both dist and build directories
-          if [ -d "dist" ]; then
-            BUILD_DIR="dist"
-            echo "✅ Build directory 'dist' exists"
-          elif [ -d "build" ]; then
-            BUILD_DIR="build"
-            echo "✅ Build directory 'build' exists"
-          else
-            echo "❌ No build directory found!"
-            exit 1
-          fi
-          
-          ls -la "$BUILD_DIR/"
-          
-          # Add 404.html for client-side routing (SPA fallback)
-          echo "📝 Creating 404.html for SPA routing..."
+          # Add 404.html for SPA routing
           cp "$BUILD_DIR/index.html" "$BUILD_DIR/404.html"
           
-          # Add a notice to the built index.html
-          if [ -f "$BUILD_DIR/index.html" ]; then
-            sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' "$BUILD_DIR/index.html"
-            echo "✅ Added demo banner"
-          fi
+          # Add read-only banner
+          BANNER='<body><div style="background:#dc2626;color:white;padding:8px;text-align:center;font-size:14px;font-weight:600;">🔒 READ-ONLY DEMO • Data cannot be saved • <a href="https://github.com/${{ github.repository }}" style="color:#fef2f2;text-decoration:underline">View Source</a></div>'
           
-          # Also add banner to 404.html
-          if [ -f "$BUILD_DIR/404.html" ]; then
-            sed -i 's|<body>|<body><div style="background:#1e3a8a;color:white;padding:8px;text-align:center;font-size:14px;">📌 Demo Mode: Data stored in browser only • <a href="https://github.com/${{ github.repository }}" style="color:#60a5fa">View Source</a></div>|' "$BUILD_DIR/404.html"
-          fi
+          sed -i "s|<body>|$BANNER|" "$BUILD_DIR/index.html"
+          sed -i "s|<body>|$BANNER|" "$BUILD_DIR/404.html"
           
-          # Store the build directory name for the next step
           echo "BUILD_DIR=$BUILD_DIR" >> $GITHUB_ENV
 
       - name: Setup Pages
