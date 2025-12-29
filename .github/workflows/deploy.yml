@@ -162,119 +162,132 @@ jobs:
           cat > src/lib/readOnlyInterceptor.js << 'INTERCEPTOR_EOF'
           import { DEMO_ASSETS, DEMO_SNAPSHOTS, DEMO_SETTINGS } from './demoData.js';
           
-          // Block any modification attempts
-          const READ_ONLY_MESSAGE = 'This is a read-only demo. Data cannot be modified.';
-          
-          const shouldIntercept = (url) => {
-            if (typeof url !== 'string') return false;
-            return url.includes('localhost:4000') || 
-                   url.includes('/api/') ||
-                   url.includes('/assets') ||
-                   url.includes('/bankaccounts') ||
-                   url.includes('/liabilities') ||
-                   url.includes('/settings') ||
-                   url.includes('/history') ||
-                   url.includes('/net-worth');
-          };
-          
-          const createResponse = (data, status = 200) => ({
-            ok: status >= 200 && status < 300,
-            status: status,
-            statusText: status === 200 ? 'OK' : 'Read Only',
-            headers: new Headers({ 'content-type': 'application/json' }),
-            json: () => Promise.resolve(data),
-            text: () => Promise.resolve(JSON.stringify(data)),
-            clone: function() { return createResponse(data, status); }
-          });
-          
-          // Intercept XHR
-          const originalXHROpen = XMLHttpRequest.prototype.open;
-          const originalXHRSend = XMLHttpRequest.prototype.send;
-          
-          XMLHttpRequest.prototype.open = function(method, url, ...args) {
-            this._method = method;
-            this._url = url;
-            return originalXHROpen.call(this, method, url, ...args);
-          };
-          
-          XMLHttpRequest.prototype.send = function(body) {
-            const url = this._url;
-            const method = this._method;
+          // Wait for DOM to be ready before intercepting
+          const initReadOnlyMode = () => {
+            console.log('🔒 Initializing read-only demo mode...');
             
-            if (shouldIntercept(url)) {
-              const handleRequest = () => {
-                let response;
-                
-                // Block all write operations
-                if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
-                  response = { error: READ_ONLY_MESSAGE, success: false };
-                  console.warn('🔒', READ_ONLY_MESSAGE);
-                } else {
-                  // Handle GET requests
-                  if (url.includes('/assets') || url.includes('/bankaccounts')) {
-                    response = DEMO_ASSETS;
-                  } else if (url.includes('/net-worth')) {
-                    response = DEMO_SNAPSHOTS;
-                  } else if (url.includes('/settings')) {
-                    response = DEMO_SETTINGS;
-                  } else if (url.includes('/liabilities')) {
-                    response = [];
+            const READ_ONLY_MESSAGE = 'This is a read-only demo. Data cannot be modified.';
+            
+            const shouldIntercept = (url) => {
+              if (typeof url !== 'string') return false;
+              return url.includes('localhost:4000') || 
+                     url.includes('/api/') ||
+                     url.includes('/assets') ||
+                     url.includes('/bankaccounts') ||
+                     url.includes('/liabilities') ||
+                     url.includes('/settings') ||
+                     url.includes('/history') ||
+                     url.includes('/net-worth');
+            };
+            
+            const createResponse = (data, status = 200) => ({
+              ok: status >= 200 && status < 300,
+              status: status,
+              statusText: status === 200 ? 'OK' : 'Read Only',
+              headers: new Headers({ 'content-type': 'application/json' }),
+              json: () => Promise.resolve(data),
+              text: () => Promise.resolve(JSON.stringify(data)),
+              clone: function() { return createResponse(data, status); }
+            });
+            
+            // Intercept XHR
+            const originalXHROpen = XMLHttpRequest.prototype.open;
+            const originalXHRSend = XMLHttpRequest.prototype.send;
+            
+            XMLHttpRequest.prototype.open = function(method, url, ...args) {
+              this._method = method;
+              this._url = url;
+              return originalXHROpen.call(this, method, url, ...args);
+            };
+            
+            XMLHttpRequest.prototype.send = function(body) {
+              const url = this._url;
+              const method = this._method;
+              
+              if (shouldIntercept(url)) {
+                const handleRequest = () => {
+                  let response;
+                  
+                  // Block all write operations
+                  if (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') {
+                    response = { error: READ_ONLY_MESSAGE, success: false };
+                    console.warn('🔒', READ_ONLY_MESSAGE);
                   } else {
-                    response = [];
+                    // Handle GET requests
+                    if (url.includes('/assets') || url.includes('/bankaccounts')) {
+                      response = DEMO_ASSETS;
+                    } else if (url.includes('/net-worth')) {
+                      response = DEMO_SNAPSHOTS;
+                    } else if (url.includes('/settings')) {
+                      response = DEMO_SETTINGS;
+                    } else if (url.includes('/liabilities')) {
+                      response = [];
+                    } else {
+                      response = [];
+                    }
                   }
-                }
+                  
+                  const responseText = JSON.stringify(response);
+                  Object.defineProperty(this, 'status', { value: 200, configurable: true });
+                  Object.defineProperty(this, 'statusText', { value: 'OK', configurable: true });
+                  Object.defineProperty(this, 'readyState', { value: 4, configurable: true });
+                  Object.defineProperty(this, 'responseText', { value: responseText, configurable: true });
+                  Object.defineProperty(this, 'response', { value: response, configurable: true });
+                  
+                  if (this.onreadystatechange) this.onreadystatechange.call(this);
+                  if (this.onload) this.onload.call(this, new Event('load'));
+                };
                 
-                const responseText = JSON.stringify(response);
-                Object.defineProperty(this, 'status', { value: 200, configurable: true });
-                Object.defineProperty(this, 'statusText', { value: 'OK', configurable: true });
-                Object.defineProperty(this, 'readyState', { value: 4, configurable: true });
-                Object.defineProperty(this, 'responseText', { value: responseText, configurable: true });
-                Object.defineProperty(this, 'response', { value: response, configurable: true });
-                
-                if (this.onreadystatechange) this.onreadystatechange.call(this);
-                if (this.onload) this.onload.call(this, new Event('load'));
-              };
-              
-              handleRequest.call(this);
-              return;
-            }
-            
-            return originalXHRSend.call(this, body);
-          };
-          
-          // Intercept fetch
-          const originalFetch = window.fetch;
-          window.fetch = function(...args) {
-            const url = args[0];
-            const options = args[1] || {};
-            
-            if (shouldIntercept(url)) {
-              const method = options.method || 'GET';
-              
-              // Block write operations
-              if (method !== 'GET') {
-                console.warn('🔒', READ_ONLY_MESSAGE);
-                return Promise.resolve(createResponse({ error: READ_ONLY_MESSAGE, success: false }, 403));
+                handleRequest.call(this);
+                return;
               }
               
-              // Handle GET requests
-              if (url.includes('/assets') || url.includes('/bankaccounts')) {
-                return Promise.resolve(createResponse(DEMO_ASSETS));
-              } else if (url.includes('/net-worth')) {
-                return Promise.resolve(createResponse(DEMO_SNAPSHOTS));
-              } else if (url.includes('/settings')) {
-                return Promise.resolve(createResponse(DEMO_SETTINGS));
-              } else if (url.includes('/liabilities')) {
+              return originalXHRSend.call(this, body);
+            };
+            
+            // Intercept fetch
+            const originalFetch = window.fetch;
+            window.fetch = function(...args) {
+              const url = args[0];
+              const options = args[1] || {};
+              
+              if (shouldIntercept(url)) {
+                const method = options.method || 'GET';
+                
+                // Block write operations
+                if (method !== 'GET') {
+                  console.warn('🔒', READ_ONLY_MESSAGE);
+                  return Promise.resolve(createResponse({ error: READ_ONLY_MESSAGE, success: false }, 403));
+                }
+                
+                // Handle GET requests
+                if (url.includes('/assets') || url.includes('/bankaccounts')) {
+                  return Promise.resolve(createResponse(DEMO_ASSETS));
+                } else if (url.includes('/net-worth')) {
+                  return Promise.resolve(createResponse(DEMO_SNAPSHOTS));
+                } else if (url.includes('/settings')) {
+                  return Promise.resolve(createResponse(DEMO_SETTINGS));
+                } else if (url.includes('/liabilities')) {
+                  return Promise.resolve(createResponse([]));
+                }
+                
                 return Promise.resolve(createResponse([]));
               }
               
-              return Promise.resolve(createResponse([]));
-            }
+              return originalFetch.apply(this, args);
+            };
             
-            return originalFetch.apply(this, args);
+            console.log('✅ Read-only demo mode active - all modifications are disabled');
           };
           
-          console.log('🔒 Read-only demo mode active - all modifications are disabled');
+          // Initialize immediately
+          if (typeof window !== 'undefined') {
+            try {
+              initReadOnlyMode();
+            } catch (error) {
+              console.error('Failed to initialize read-only mode:', error);
+            }
+          }
           INTERCEPTOR_EOF
 
       - name: Inject interceptor
@@ -282,12 +295,36 @@ jobs:
         run: |
           echo "🔍 Injecting read-only interceptor..."
           
-          ENTRY_FILE=$(find src -maxdepth 1 \( -name "main.*" -o -name "index.*" \) | head -1)
+          # Find entry file more thoroughly
+          ENTRY_FILE=""
           
-          if [ -n "$ENTRY_FILE" ]; then
-            echo "import './lib/readOnlyInterceptor.js';" | cat - "$ENTRY_FILE" > temp && mv temp "$ENTRY_FILE"
-            echo "✅ Interceptor injected into $ENTRY_FILE"
+          if [ -f "src/main.jsx" ]; then
+            ENTRY_FILE="src/main.jsx"
+          elif [ -f "src/main.tsx" ]; then
+            ENTRY_FILE="src/main.tsx"
+          elif [ -f "src/index.jsx" ]; then
+            ENTRY_FILE="src/index.jsx"
+          elif [ -f "src/index.tsx" ]; then
+            ENTRY_FILE="src/index.tsx"
+          elif [ -f "src/main.js" ]; then
+            ENTRY_FILE="src/main.js"
+          elif [ -f "src/index.js" ]; then
+            ENTRY_FILE="src/index.js"
+          else
+            echo "❌ Could not find entry file"
+            ls -la src/
+            exit 1
           fi
+          
+          echo "✅ Found entry file: $ENTRY_FILE"
+          echo "📄 Original content (first 5 lines):"
+          head -5 "$ENTRY_FILE"
+          
+          # Inject the import
+          echo "import './lib/readOnlyInterceptor.js';" | cat - "$ENTRY_FILE" > temp && mv temp "$ENTRY_FILE"
+          
+          echo "📄 Modified content (first 10 lines):"
+          head -10 "$ENTRY_FILE"
 
       - name: Update Vite config
         working-directory: ./frontend
